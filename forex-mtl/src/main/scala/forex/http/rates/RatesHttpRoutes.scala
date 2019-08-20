@@ -18,6 +18,8 @@ class RatesHttpRoutes[F[_]: Sync](rates: RatesProgram[F]) extends Http4sDsl[F] {
   private val httpRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case GET -> Root :? FromQueryParam(from) +& ToQueryParam(to) =>
       rates.get(RatesProgramProtocol.GetRatesRequest(from, to))
+        // TODO: convert this to { error => InternalServerError(error.asApiResponse) }
+        // TODO: Sync assures external side effects won't be running up until this point, should revise cache invalidation?
         .flatMap(Sync[F].fromEither)
         .flatMap { rate => Ok(rate.asGetApiResponse) }
   }

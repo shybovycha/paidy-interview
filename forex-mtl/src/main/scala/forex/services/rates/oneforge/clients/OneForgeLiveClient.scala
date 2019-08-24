@@ -16,8 +16,8 @@ import forex.services.rates.Errors.Error.NetworkFailure
 import forex.services.rates.Errors.Error.UnknownFailure
 import forex.services.rates.Errors._
 import io.circe.generic.auto._
-import org.http4s.InvalidMessageBodyFailure
 import org.http4s.EntityDecoder
+import org.http4s.InvalidMessageBodyFailure
 import org.http4s.Uri
 import org.http4s.circe.jsonOf
 import org.http4s.client.blaze.BlazeClientBuilder

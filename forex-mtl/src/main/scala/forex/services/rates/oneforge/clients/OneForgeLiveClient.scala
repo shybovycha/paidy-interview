@@ -6,11 +6,13 @@ import java.util.concurrent.TimeoutException
 import cats.Monad
 import cats.effect._
 import cats.implicits._
+import forex.config.ForexConfig
 import forex.domain.Currency
 import forex.domain.Price
 import forex.domain.Rate
 import forex.domain.Timestamp
 import forex.services.rates.Algebra
+import forex.services.rates.Errors.Error.BadConfiguration
 import forex.services.rates.Errors.Error.BadResponseFailure
 import forex.services.rates.Errors.Error.CanNotRetrieveFromCache
 import forex.services.rates.Errors.Error.NetworkFailure
@@ -41,7 +43,7 @@ object OneForgeLiveClient {
 
 }
 
-object QuoteRefresher {
+class QuoteRefresher(config: ForexConfig) {
 
   case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
 
@@ -71,16 +73,20 @@ object QuoteRefresher {
     Rate(Rate.Pair(from, to), price, timestamp)
   }
 
-  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[(String, String)]): F[Error Either List[QuoteDTO]] = {
+  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[(String, String)]): F[Error Either List[QuoteDTO]] =
+    getRefreshCacheUri(currencyPairs).fold(
+      error => Either.left[Error, List[QuoteDTO]](error).pure[F],
+      uri => IO(getOneForgeResponse(uri)).unsafeRunSync
+    )
+
+  private def getOneForgeResponse[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[QuoteDTO]]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
 
-    val x: F[Either[Error, List[QuoteDTO]]] = BlazeClientBuilder[F](global)
+    BlazeClientBuilder[F](global)
       .resource
-      .use(_.expect[List[QuoteDTO]](getRefreshCacheUri(currencyPairs)))
+      .use(_.expect[List[QuoteDTO]](uri))
       .attempt
-      .map(either => either.leftMap(handleRefreshError))
-
-    IO(x).unsafeRunSync
+      .flatMap(either => either.leftMap(handleRefreshError).pure[F])
   }
 
   private def handleRefreshError(error: Throwable): Error = error match {
@@ -92,8 +98,11 @@ object QuoteRefresher {
 
   private def getErrorMessage(error: Throwable): String = error.toString
 
-  private def getRefreshCacheUri(currencyPairs: List[(String, String)]): Uri = Uri.uri("http://localhost:4567/quotes")
-    .withQueryParam("pairs", currencyPairs.flatMap(e => List(e._1, e._2)).mkString(""))
-    .withQueryParam("api_key", "API_KEY")
+  private def getRefreshCacheUri(currencyPairs: List[(String, String)]): Either[Error, Uri] =
+    Uri.fromString(config.host)
+      .map(_.withQueryParam("pairs", currencyPairs.flatMap(e => List(e._1, e._2)).mkString(""))
+            .withQueryParam("api_key", config.apiKey)
+      )
+      .leftMap(parseError => BadConfiguration(parseError.message))
 
 }

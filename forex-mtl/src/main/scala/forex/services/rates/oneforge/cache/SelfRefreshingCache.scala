@@ -29,7 +29,7 @@ object SelfRefreshingCache {
         .flatMap(refresher)
         .map(_.map(state.set)) // here we potentially ignore the None() case, which might be due to for ex. a HTTP error
 
-      Timer[F].sleep(timeout) >> process >> refreshRoutine(state)
+      process >> Timer[F].sleep(timeout) >> refreshRoutine(state)
     }
 
     Ref.of[F, Map[K, V]](Map.empty)

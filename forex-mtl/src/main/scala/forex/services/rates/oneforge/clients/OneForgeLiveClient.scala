@@ -3,18 +3,21 @@ package forex.services.rates.oneforge.clients
 import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 
-import cats.Applicative
-import cats.effect.IO
+import cats.Monad
 import cats.effect._
-import cats.syntax.all._
+import cats.implicits._
+import forex.domain.Currency
 import forex.domain.Price
 import forex.domain.Rate
 import forex.domain.Timestamp
 import forex.services.rates.Algebra
 import forex.services.rates.Errors.Error.BadResponseFailure
+import forex.services.rates.Errors.Error.CanNotRetrieveFromCache
 import forex.services.rates.Errors.Error.NetworkFailure
 import forex.services.rates.Errors.Error.UnknownFailure
 import forex.services.rates.Errors._
+import forex.services.rates.oneforge.cache.Cache
+import forex.services.rates.oneforge.cache.SelfRefreshingCache
 import io.circe.generic.auto._
 import org.http4s.EntityDecoder
 import org.http4s.InvalidMessageBodyFailure
@@ -23,45 +26,69 @@ import org.http4s.circe.jsonOf
 import org.http4s.client.blaze.BlazeClientBuilder
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
-class OneForgeLiveClient[F[_]: Applicative] extends Algebra[F] {
+class OneForgeLiveClient[F[_]: Monad](cache: F[Cache[F, Rate.Pair, Rate]]) extends Algebra[F] {
 
-  override def get(pair: Rate.Pair): F[Error Either Rate] = QuoteCache.refreshCache(List(getCurrencyCodePair(pair)))
-    .map(_.head)
-    .map(quote => new Rate(pair, new Price((quote.price * 100.0).toInt), Timestamp.now))
-    .pure[F]
-
-  private def getCurrencyCodePair(pair: Rate.Pair): (String, String) = (pair.from.toString, pair.to.toString)
+  override def get(pair: Rate.Pair): F[Error Either Rate] =
+    cache.flatMap(_.get(pair))
+      .map(_.toRight(CanNotRetrieveFromCache()))
 
 }
 
 object OneForgeLiveClient {
 
-  def apply[F[_]: Applicative]: Algebra[F] = new OneForgeLiveClient[F]()
+  def apply[F[_]: ConcurrentEffect: Timer]: Algebra[F] = {
+    val timeout = 5.seconds
+
+    val cache = SelfRefreshingCache.create[F, Rate.Pair, Rate](QuoteRefresher.refreshRatesCache[F], timeout)
+
+    new OneForgeLiveClient(cache)
+  }
 
 }
 
-object QuoteCache {
+object QuoteRefresher {
 
-  import JsonHelpers._
+  case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
 
-  implicit val cs: ContextShift[IO] = IO.contextShift(global)
-  implicit val timer: Timer[IO] = IO.timer(global)
+  def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Rate]): F[Option[Map[Rate.Pair, Rate]]] = {
+    val currencyPairs: List[(String, String)] = existingRates.keySet.map(pair => (pair.from.toString, pair.to.toString)).toList
+    val newQuoteDTOs: F[Error Either List[QuoteDTO]] = fetchQuotes(currencyPairs)
 
-//  implicit val responseDecoder: EntityDecoder[IO, List[Quote]] = jsonOf[IO, List[Quote]]
+    val newRates: F[Option[List[Rate]]] = newQuoteDTOs.map(_.toOption.map(_.map(quoteToRate)))
 
-  def refreshCache(currencyPairs: List[(String, String)]): Either[Error, List[Quote]] = BlazeClientBuilder[IO](global)
-    .resource
-    .use(_.expect[List[Quote]](getRefreshCacheUri(currencyPairs)))
-    .attempt
-    .unsafeRunSync
-    .leftMap(handleRefreshError)
+    def updateCache(rates: List[Rate]): Map[Rate.Pair, Rate] =
+      rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Rate]) => acc.updated(rate.pair, rate))
 
-//  private def handleRefreshError[A <: Coproduct](error: Throwable)(implicit inj1: Inject[A, UnknownFailure], inj2: Inject[A, NetworkFailure]): A = error match {
-//    case _: TimeoutException => Coproduct[A](NetworkFailure(getErrorMessage(error)))
-//    case _: ConnectException => Coproduct[A](NetworkFailure(getErrorMessage(error)))
-//    case _ => Coproduct[A](UnknownFailure(getErrorMessage(error)))
-//  }
+    newRates.map(_.map(updateCache))
+  }
+
+  private def quoteToRate(quote: QuoteDTO): Rate = {
+    val fromCurrencySymbol = quote.symbol.substring(0, 2)
+    val toCurrencySymbol = quote.symbol.substring(2, 4)
+
+    val from = Currency.fromString(fromCurrencySymbol)
+    val to = Currency.fromString(toCurrencySymbol)
+
+    val price = Price(quote.price * 100)
+
+    val timestamp = Timestamp.now
+
+    Rate(Rate.Pair(from, to), price, timestamp)
+  }
+
+  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[(String, String)]): F[Error Either List[QuoteDTO]] = {
+    implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
+
+    val x: F[Either[Error, List[QuoteDTO]]] = BlazeClientBuilder[F](global)
+      .resource
+      .use(_.expect[List[QuoteDTO]](getRefreshCacheUri(currencyPairs)))
+      .attempt
+      .map(either => either.leftMap(handleRefreshError))
+
+    IO(x).unsafeRunSync
+  }
 
   private def handleRefreshError(error: Throwable): Error = error match {
     case _: TimeoutException => NetworkFailure(getErrorMessage(error))
@@ -77,11 +104,3 @@ object QuoteCache {
     .withQueryParam("api_key", "API_KEY")
 
 }
-
-object JsonHelpers {
-
-  implicit val quoteListDecoder: EntityDecoder[IO, List[Quote]] = jsonOf[IO, List[Quote]]
-
-}
-
-case class Quote(symbol: String, price: Double, timestamp: Int)

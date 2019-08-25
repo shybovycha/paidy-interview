@@ -11,6 +11,7 @@ object Errors {
     final case class NetworkFailure(msg: String) extends Error
     final case class UnknownFailure(msg: String) extends Error
     final case class BadResponseFailure(msg: String) extends Error
+    final case class CanNotRetrieveFromCache() extends Error
 
   }
 

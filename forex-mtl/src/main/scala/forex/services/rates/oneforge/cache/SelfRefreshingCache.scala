@@ -1,15 +1,16 @@
 package forex.services.rates.oneforge.cache
 
 import cats.Monad
-import cats.effect.Sync
 import cats.effect.Timer
+import cats.effect._
 import cats.effect.concurrent.Ref
-import cats.syntax.all._
+import cats.effect.syntax.concurrent._
+import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
 
-private class SelfRefreshingCache[F[_]: Monad: Sync, K, V]
-(state: Ref[F, Map[K, V]], refresher: Map[K, V] => F[Map[K, V]], timeout: FiniteDuration) extends Algebra[F, K, V] {
+private class SelfRefreshingCache[F[_]: Monad, K, V]
+(state: Ref[F, Map[K, V]], refresher: Map[K, V] => F[Option[Map[K, V]]], timeout: FiniteDuration) extends Cache[F, K, V] {
 
   override def get(key: K): F[Option[V]] =
     state.get.map(_.get(key))
@@ -21,18 +22,18 @@ private class SelfRefreshingCache[F[_]: Monad: Sync, K, V]
 
 object SelfRefreshingCache {
 
-  def create[F[_] : Monad : Sync, K, V]
-  (refresher: Map[K, V] => F[Map[K, V]], timeout: FiniteDuration)
-  (implicit timer: Timer[F]): F[Algebra[F, K, V]] = {
+  def create[F[_]: Concurrent: Timer, K, V](refresher: Map[K, V] => F[Option[Map[K, V]]], timeout: FiniteDuration): F[Cache[F, K, V]] = {
 
     def refreshRoutine(state: Ref[F, Map[K, V]]): F[Unit] = {
-      val process = state.get.flatMap(refresher).map(state.set)
+      val process = state.get
+        .flatMap(refresher)
+        .map(_.map(state.set)) // here we potentially ignore the None() case, which might be due to for ex. a HTTP error
 
-      timer.sleep(timeout) >> process >> refreshRoutine(state)
+      Timer[F].sleep(timeout) >> process >> refreshRoutine(state)
     }
 
     Ref.of[F, Map[K, V]](Map.empty)
-      .flatTap(refreshRoutine)
+      .flatTap(refreshRoutine(_).start.void)
       .map(ref => new SelfRefreshingCache[F, K, V](ref, refresher, timeout))
 
   }

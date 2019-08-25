@@ -24,11 +24,10 @@ class Application[F[_]: ConcurrentEffect: Timer] {
   def stream: Stream[F, Unit] =
     for {
       config <- Config.stream("app")
-      timeout = 5.minutes
-      cache = SelfRefreshingCache.create[F, Rate.Pair, Rate](QuoteRefresher.refreshRatesCache[F], timeout)
-      module = new Module[F](config, cache)
+      cache <- Stream.eval(SelfRefreshingCache.create[F, Rate.Pair, Rate](QuoteRefresher.refreshRatesCache[F], 5.minutes))
       // TODO: check if this does start refresher in a separate thread indeed and that 30 second response from API won't break this
-      _ <- Stream.eval(IO(cache).unsafeRunSync)
+      _ = Stream.eval(IO(cache).unsafeRunSync)
+      module = new Module[F](config, cache)
       _ <- BlazeServerBuilder[F]
             .bindHttp(config.http.port, config.http.host)
             .withHttpApp(module.httpApp)

@@ -26,17 +26,17 @@ import org.http4s.client.blaze.BlazeClientBuilder
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OneForgeLiveClient[F[_]: Monad](implicit cache: F[Cache[F, Rate.Pair, Rate]]) extends Algebra[F] {
+class OneForgeLiveClient[F[_]: Monad](implicit cache: Cache[F, Rate.Pair, Rate]) extends Algebra[F] {
 
   override def get(pair: Rate.Pair): F[Error Either Rate] =
-    cache.flatMap(_.get(pair))
+    cache.get(pair)
       .map(_.toRight(CanNotRetrieveFromCache()))
 
 }
 
 object OneForgeLiveClient {
 
-  def apply[F[_]: ConcurrentEffect: Timer](implicit cache: F[Cache[F, Rate.Pair, Rate]]): Algebra[F] =
+  def apply[F[_]: ConcurrentEffect: Timer](implicit cache: Cache[F, Rate.Pair, Rate]): Algebra[F] =
     new OneForgeLiveClient
 
 }

@@ -13,9 +13,9 @@ import org.http4s.implicits._
 import org.http4s.server.middleware.AutoSlash
 import org.http4s.server.middleware.Timeout
 
-class Module[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig, cache: F[Cache[F, Rate.Pair, Rate]]) {
+class Module[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig, cache: Cache[F, Rate.Pair, Rate]) {
 
-  private implicit val cacheImplicit: F[Cache[F, Rate.Pair, Rate]] = cache
+  private implicit val cacheImplicit: Cache[F, Rate.Pair, Rate] = cache
 
   private val ratesService: RatesService[F] = RatesServices.live[F]
 

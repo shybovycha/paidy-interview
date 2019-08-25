@@ -1,15 +1,19 @@
 package forex
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.ConcurrentEffect
+import cats.effect.Timer
 import forex.config.ApplicationConfig
+import forex.domain.Rate
 import forex.http.rates.RatesHttpRoutes
-import forex.services._
 import forex.programs._
+import forex.services._
+import forex.services.rates.oneforge.cache.Cache
 import org.http4s._
 import org.http4s.implicits._
-import org.http4s.server.middleware.{AutoSlash, Timeout}
+import org.http4s.server.middleware.AutoSlash
+import org.http4s.server.middleware.Timeout
 
-class Module[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig) {
+class Module[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig)(implicit cache: F[Cache[F, Rate.Pair, Rate]]) {
 
   private val ratesService: RatesService[F] = RatesServices.live[F]
 

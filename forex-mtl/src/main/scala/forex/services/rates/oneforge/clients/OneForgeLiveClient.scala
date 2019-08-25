@@ -17,7 +17,6 @@ import forex.services.rates.Errors.Error.NetworkFailure
 import forex.services.rates.Errors.Error.UnknownFailure
 import forex.services.rates.Errors._
 import forex.services.rates.oneforge.cache.Cache
-import forex.services.rates.oneforge.cache.SelfRefreshingCache
 import io.circe.generic.auto._
 import org.http4s.EntityDecoder
 import org.http4s.InvalidMessageBodyFailure
@@ -26,9 +25,8 @@ import org.http4s.circe.jsonOf
 import org.http4s.client.blaze.BlazeClientBuilder
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
-class OneForgeLiveClient[F[_]: Monad](cache: F[Cache[F, Rate.Pair, Rate]]) extends Algebra[F] {
+class OneForgeLiveClient[F[_]: Monad](implicit cache: F[Cache[F, Rate.Pair, Rate]]) extends Algebra[F] {
 
   override def get(pair: Rate.Pair): F[Error Either Rate] =
     cache.flatMap(_.get(pair))
@@ -38,13 +36,8 @@ class OneForgeLiveClient[F[_]: Monad](cache: F[Cache[F, Rate.Pair, Rate]]) exten
 
 object OneForgeLiveClient {
 
-  def apply[F[_]: ConcurrentEffect: Timer]: Algebra[F] = {
-    val timeout = 5.seconds
-
-    val cache = SelfRefreshingCache.create[F, Rate.Pair, Rate](QuoteRefresher.refreshRatesCache[F], timeout)
-
-    new OneForgeLiveClient(cache)
-  }
+  def apply[F[_]: ConcurrentEffect: Timer](implicit cache: F[Cache[F, Rate.Pair, Rate]]): Algebra[F] =
+    new OneForgeLiveClient
 
 }
 

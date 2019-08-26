@@ -9,8 +9,7 @@ import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
 
-private class SelfRefreshingCache[F[_]: Functor, K, V]
-(state: Ref[F, Map[K, V]], refresher: Map[K, V] => F[Option[Map[K, V]]], timeout: FiniteDuration) extends Cache[F, K, V] {
+private class SelfRefreshingCache[F[_]: Functor, K, V](state: Ref[F, Map[K, V]]) extends Cache[F, K, V] {
 
   override def get(key: K): F[Option[V]] =
     state.get.map(_.get(key))
@@ -27,15 +26,15 @@ object SelfRefreshingCache {
     def refreshRoutine(state: Ref[F, Map[K, V]]): F[Unit] = {
       val process = state.get
         .flatMap(refresher)
-        // here we potentially ignore the None() case, which might be due to for ex. a HTTP error
-        .map(_.map(state.set))
+        .flatMap(_.fold(state.get)(state.getAndSet))
+      // here by using Option#foreach we potentially ignore the None() case, which might be due to for ex. a HTTP error
 
       process >> Timer[F].sleep(timeout) >> refreshRoutine(state)
     }
 
     Ref.of[F, Map[K, V]](initialState)
       .flatTap(refreshRoutine(_).start.void)
-      .map(ref => new SelfRefreshingCache[F, K, V](ref, refresher, timeout))
+      .map(new SelfRefreshingCache[F, K, V](_))
 
   }
 

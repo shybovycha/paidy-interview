@@ -1,6 +1,6 @@
 package forex.services.rates.oneforge.cache
 
-import cats.Monad
+import cats.Functor
 import cats.effect.Timer
 import cats.effect._
 import cats.effect.concurrent.Ref
@@ -9,7 +9,7 @@ import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
 
-private class SelfRefreshingCache[F[_]: Monad, K, V]
+private class SelfRefreshingCache[F[_]: Functor, K, V]
 (state: Ref[F, Map[K, V]], refresher: Map[K, V] => F[Option[Map[K, V]]], timeout: FiniteDuration) extends Cache[F, K, V] {
 
   override def get(key: K): F[Option[V]] =

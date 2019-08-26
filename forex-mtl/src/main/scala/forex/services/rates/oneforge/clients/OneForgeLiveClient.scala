@@ -3,7 +3,7 @@ package forex.services.rates.oneforge.clients
 import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 
-import cats.Monad
+import cats.Functor
 import cats.effect._
 import cats.implicits._
 import forex.config.ForexConfig
@@ -28,7 +28,7 @@ import org.http4s.client.blaze.BlazeClientBuilder
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OneForgeLiveClient[F[_]: Monad](implicit cache: Cache[F, Rate.Pair, Rate]) extends Algebra[F] {
+class OneForgeLiveClient[F[_]: Functor](implicit cache: Cache[F, Rate.Pair, Rate]) extends Algebra[F] {
 
   override def get(pair: Rate.Pair): F[Error Either Rate] =
     cache.get(pair)

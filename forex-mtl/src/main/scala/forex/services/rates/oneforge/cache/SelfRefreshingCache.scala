@@ -27,7 +27,6 @@ object SelfRefreshingCache {
       val process = state.get
         .flatMap(refresher)
         .flatMap(_.fold(state.get)(state.getAndSet))
-      // here by using Option#foreach we potentially ignore the None() case, which might be due to for ex. a HTTP error
 
       process >> Timer[F].sleep(timeout) >> refreshRoutine(state)
     }

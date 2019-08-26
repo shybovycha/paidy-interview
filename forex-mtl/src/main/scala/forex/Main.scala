@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect._
 import cats.syntax.all._
 import forex.config._
-import forex.services.rates.oneforge.clients.QuoteRefresher
+import forex.services.rates.oneforge.cache.QuoteCache
 import fs2.Stream
 import org.http4s.server.blaze.BlazeServerBuilder
 
@@ -20,7 +20,7 @@ class Application[F[_]: ConcurrentEffect: Timer] {
   def stream: Stream[F, Unit] =
     for {
       config <- Config.stream("app")
-      cache <- Stream.eval(QuoteRefresher.createCache(config))
+      cache <- Stream.eval(QuoteCache.create(config))
       module = new Module[F](config, cache)
       _ <- BlazeServerBuilder[F]
             .bindHttp(config.http.port, config.http.host)

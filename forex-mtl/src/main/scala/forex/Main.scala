@@ -4,8 +4,6 @@ import cats.effect.IO
 import cats.effect._
 import cats.syntax.all._
 import forex.config._
-import forex.domain.Rate
-import forex.services.rates.oneforge.cache.SelfRefreshingCache
 import forex.services.rates.oneforge.clients.QuoteRefresher
 import fs2.Stream
 import org.http4s.server.blaze.BlazeServerBuilder
@@ -22,9 +20,7 @@ class Application[F[_]: ConcurrentEffect: Timer] {
   def stream: Stream[F, Unit] =
     for {
       config <- Config.stream("app")
-      cache <- Stream.eval(SelfRefreshingCache.create[F, Rate.Pair, Rate](new QuoteRefresher(config.forex).refreshRatesCache[F], config.forex.dataExpiresIn))
-      // TODO: check if this does start refresher in a separate thread indeed and that 30 second response from API won't break this
-      _ = Stream.eval(IO(cache).unsafeRunSync)
+      cache <- Stream.eval(QuoteRefresher.createCache(config))
       module = new Module[F](config, cache)
       _ <- BlazeServerBuilder[F]
             .bindHttp(config.http.port, config.http.host)

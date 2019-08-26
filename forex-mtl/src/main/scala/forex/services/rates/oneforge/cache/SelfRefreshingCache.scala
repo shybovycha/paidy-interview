@@ -22,17 +22,18 @@ private class SelfRefreshingCache[F[_]: Functor, K, V]
 
 object SelfRefreshingCache {
 
-  def create[F[_]: Concurrent: Timer, K, V](refresher: Map[K, V] => F[Option[Map[K, V]]], timeout: FiniteDuration): F[Cache[F, K, V]] = {
+  def create[F[_]: Concurrent: Timer, K, V](initialState: Map[K, V], refresher: Map[K, V] => F[Option[Map[K, V]]], timeout: FiniteDuration): F[Cache[F, K, V]] = {
 
     def refreshRoutine(state: Ref[F, Map[K, V]]): F[Unit] = {
       val process = state.get
         .flatMap(refresher)
-        .map(_.map(state.set)) // here we potentially ignore the None() case, which might be due to for ex. a HTTP error
+        // here we potentially ignore the None() case, which might be due to for ex. a HTTP error
+        .map(_.map(state.set))
 
       process >> Timer[F].sleep(timeout) >> refreshRoutine(state)
     }
 
-    Ref.of[F, Map[K, V]](Map.empty)
+    Ref.of[F, Map[K, V]](initialState)
       .flatTap(refreshRoutine(_).start.void)
       .map(ref => new SelfRefreshingCache[F, K, V](ref, refresher, timeout))
 

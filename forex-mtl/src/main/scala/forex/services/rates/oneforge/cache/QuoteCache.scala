@@ -39,14 +39,13 @@ class QuoteCache(config: ForexConfig) {
 
   def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Option[Rate]]): F[Option[Map[Rate.Pair, Option[Rate]]]] = {
     val currencyPairs: List[(String, String)] = existingRates.keySet.map(pair => (pair.from.toString, pair.to.toString)).toList
-    val newQuoteDTOs: F[Error Either List[QuoteDTO]] = fetchQuotes(currencyPairs)
 
-    val newRates: F[Option[List[Rate]]] = newQuoteDTOs.map(_.toOption.map(_.map(quoteToRate)))
-
-    def updateCache(rates: List[Rate]): Map[Rate.Pair, Option[Rate]] =
+    val updateCache = (rates: List[Rate]) =>
       rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Option[Rate]]) => acc.updated(rate.pair, Some[Rate](rate)))
 
-    newRates.map(_.map(updateCache))
+    fetchQuotes(currencyPairs)
+      .map(_.toOption.map(_.map(quoteToRate)))
+      .map(_.map(updateCache))
   }
 
   private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[(String, String)]): F[Error Either List[QuoteDTO]] =

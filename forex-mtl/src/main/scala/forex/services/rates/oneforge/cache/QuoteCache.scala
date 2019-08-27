@@ -3,7 +3,6 @@ package forex.services.rates.oneforge.cache
 import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 
-import cats.Applicative
 import cats.effect._
 import cats.syntax.all._
 import forex.config.ApplicationConfig
@@ -29,11 +28,11 @@ import org.http4s.client.blaze.BlazeClientBuilder
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class QuoteCache(config: ForexConfig) {
+class QuoteCache[F[_]: ConcurrentEffect](config: ForexConfig) {
 
   case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
 
-  private def fetchPossiblePairs[F[_]: ConcurrentEffect]: F[Either[Error, List[Rate.Pair]]] = {
+  private def fetchPossiblePairs: F[Either[Error, List[Rate.Pair]]] = {
     symbolsUri
       .fold(
         error => Either.left[Error, List[Rate.Pair]](CanNotParseSymbolsUri(error.toString)).pure[F],
@@ -41,30 +40,30 @@ class QuoteCache(config: ForexConfig) {
       )
   }
 
-  def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] = {
+  def refreshRatesCache(existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] = {
     val updateCache = (rates: List[Rate]) =>
       rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Rate]) => acc.updated(rate.pair, rate))
 
-    getCurrencyPairs[F](existingRates)
-      .flatMap(fetchQuotes(_))
+    getCurrencyPairs(existingRates)
+      .flatMap(fetchQuotes)
       .map(_.map(updateCache))
   }
 
-  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[Rate.Pair]): F[Error Either List[Rate]] =
+  private def fetchQuotes(currencyPairs: List[Rate.Pair]): F[Error Either List[Rate]] =
     convertRateUri(currencyPairs)
       .fold(
         error => Either.left[Error, List[Rate]](CanNotParseConvertUri(error.toString)).pure[F],
         uri => oneForgeConvertRate(uri)
       )
 
-  private def getCurrencyPairs[F[_]: Applicative: ConcurrentEffect](existingRates: Map[Rate.Pair, Rate]): F[List[Rate.Pair]] =
+  private def getCurrencyPairs(existingRates: Map[Rate.Pair, Rate]): F[List[Rate.Pair]] =
     if (existingRates.isEmpty) {
       fetchPossiblePairs.map((e: Either[Error, List[Rate.Pair]]) => e.getOrElse(Nil))
     } else {
       existingRates.keySet.toList.pure[F]
     }
 
-  private def oneForgeConvertRate[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[Rate]]] = {
+  private def oneForgeConvertRate(uri: Uri): F[Either[Error, List[Rate]]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
 
     BlazeClientBuilder[F](global)
@@ -74,7 +73,7 @@ class QuoteCache(config: ForexConfig) {
       .map(_.bimap(handleRefreshError, _.map(quoteToRate)))
   }
 
-  private def oneForgeSymbols[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[Rate.Pair]]] = {
+  private def oneForgeSymbols(uri: Uri): F[Either[Error, List[Rate.Pair]]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
 
     BlazeClientBuilder[F](global)
@@ -130,7 +129,7 @@ object QuoteCache {
   def create[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig): F[Cache[F, Rate.Pair, Rate]] = {
     val quoteRefresher = new QuoteCache(config.forex)
 
-    SelfRefreshingCache.create[F, Rate.Pair, Rate](Map.empty, quoteRefresher.refreshRatesCache[F], config.forex.dataExpiresIn)
+    SelfRefreshingCache.create[F, Rate.Pair, Rate](Map.empty, quoteRefresher.refreshRatesCache, config.forex.dataExpiresIn)
   }
 
 }

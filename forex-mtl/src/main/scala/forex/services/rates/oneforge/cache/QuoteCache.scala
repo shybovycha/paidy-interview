@@ -14,6 +14,8 @@ import forex.domain.Rate
 import forex.domain.Timestamp
 import forex.services.rates.Errors.Error.BadConfiguration
 import forex.services.rates.Errors.Error.BadResponseFailure
+import forex.services.rates.Errors.Error.CanNotParseConvertUri
+import forex.services.rates.Errors.Error.CanNotParseSymbolsUri
 import forex.services.rates.Errors.Error.NetworkFailure
 import forex.services.rates.Errors.Error.UnknownFailure
 import forex.services.rates.Errors._
@@ -32,10 +34,11 @@ class QuoteCache(config: ForexConfig) {
   case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
 
   private def fetchPossiblePairs[F[_]: ConcurrentEffect]: F[Either[Error, Map[Rate.Pair, Option[Rate]]]] = {
-    symbolsUri.fold(
-      error => Either.left[Error, Map[Rate.Pair, Option[Rate]]](error).pure[F],
-      uri => oneForgeSymbols(uri)
-    )
+    symbolsUri
+      .fold(
+        error => Either.left[Error, Map[Rate.Pair, Option[Rate]]](CanNotParseSymbolsUri(error.toString)).pure[F],
+        uri => oneForgeSymbols(uri)
+      )
   }
 
   def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Option[Rate]]): F[Option[Map[Rate.Pair, Option[Rate]]]] = {
@@ -50,10 +53,11 @@ class QuoteCache(config: ForexConfig) {
   }
 
   private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[(String, String)]): F[Error Either List[QuoteDTO]] =
-    convertRateUri(currencyPairs).fold(
-      error => Either.left[Error, List[QuoteDTO]](error).pure[F],
-      uri => oneForgeConvertRate(uri)
-    )
+    convertRateUri(currencyPairs)
+      .fold(
+        error => Either.left[Error, List[QuoteDTO]](CanNotParseConvertUri(error.toString)).pure[F],
+        uri => oneForgeConvertRate(uri)
+      )
 
   private def getCurrencyPairs[F[_]: Applicative: ConcurrentEffect](existingRates: Map[Rate.Pair, Option[Rate]]): F[Map[Rate.Pair, Option[Rate]]] =
     if (existingRates.isEmpty) {

@@ -14,6 +14,8 @@ object Errors {
     final case class CanNotRetrieveFromCache() extends Error
     final case class CacheIsOutOfDate() extends Error
     final case class BadConfiguration(msg: String) extends Error
+    final case class CanNotParseSymbolsUri(msg: String) extends Error
+    final case class CanNotParseConvertUri(msg: String) extends Error
 
   }
 

@@ -33,37 +33,36 @@ class QuoteCache(config: ForexConfig) {
 
   case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
 
-  private def fetchPossiblePairs[F[_]: ConcurrentEffect]: F[Either[Error, Map[Rate.Pair, Option[Rate]]]] = {
+  private def fetchPossiblePairs[F[_]: ConcurrentEffect]: F[Either[Error, List[Rate.Pair]]] = {
     symbolsUri
       .fold(
-        error => Either.left[Error, Map[Rate.Pair, Option[Rate]]](CanNotParseSymbolsUri(error.toString)).pure[F],
+        error => Either.left[Error, List[Rate.Pair]](CanNotParseSymbolsUri(error.toString)).pure[F],
         uri => oneForgeSymbols(uri)
       )
   }
 
-  def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Option[Rate]]): F[Option[Map[Rate.Pair, Option[Rate]]]] = {
+  def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Rate]): F[Option[Map[Rate.Pair, Rate]]] = {
     val updateCache = (rates: List[Rate]) =>
-      rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Option[Rate]]) => acc.updated(rate.pair, Some[Rate](rate)))
+      rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Rate]) => acc.updated(rate.pair, rate))
 
     getCurrencyPairs[F](existingRates)
-      .map(_.keySet.map(pair => (pair.from.toString, pair.to.toString)).toList)
       .flatMap(fetchQuotes(_))
       .map(_.toOption.map(_.map(quoteToRate)))
       .map(_.map(updateCache))
   }
 
-  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[(String, String)]): F[Error Either List[QuoteDTO]] =
+  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[Rate.Pair]): F[Error Either List[QuoteDTO]] =
     convertRateUri(currencyPairs)
       .fold(
         error => Either.left[Error, List[QuoteDTO]](CanNotParseConvertUri(error.toString)).pure[F],
         uri => oneForgeConvertRate(uri)
       )
 
-  private def getCurrencyPairs[F[_]: Applicative: ConcurrentEffect](existingRates: Map[Rate.Pair, Option[Rate]]): F[Map[Rate.Pair, Option[Rate]]] =
+  private def getCurrencyPairs[F[_]: Applicative: ConcurrentEffect](existingRates: Map[Rate.Pair, Rate]): F[List[Rate.Pair]] =
     if (existingRates.isEmpty) {
-      fetchPossiblePairs.map((e: Either[Error, Map[Rate.Pair, Option[Rate]]]) => e.getOrElse(Map.empty))
+      fetchPossiblePairs.map((e: Either[Error, List[Rate.Pair]]) => e.getOrElse(Nil))
     } else {
-      existingRates.pure[F]
+      existingRates.keySet.toList.pure[F]
     }
 
   private def oneForgeConvertRate[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[QuoteDTO]]] = {
@@ -73,17 +72,17 @@ class QuoteCache(config: ForexConfig) {
       .resource
       .use(_.expect[List[QuoteDTO]](uri))
       .attempt
-      .flatMap(either => either.leftMap(handleRefreshError).pure[F])
+      .map(_.leftMap(handleRefreshError))
   }
 
-  private def oneForgeSymbols[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, Map[Rate.Pair, Option[Rate]]]] = {
+  private def oneForgeSymbols[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[Rate.Pair]]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
 
     BlazeClientBuilder[F](global)
       .resource
       .use(_.expect[List[String]](uri))
       .attempt
-      .map(_.bimap(handleRefreshError, currencyCodesToEmptyCache))
+      .map(_.bimap(handleRefreshError, _.map(parseCurrencyPairFromCode)))
   }
 
   private def quoteToRate(quote: QuoteDTO): Rate = {
@@ -93,11 +92,6 @@ class QuoteCache(config: ForexConfig) {
 
     Rate(pair, price, timestamp)
   }
-
-  private def currencyCodesToEmptyCache(currencyCodes: List[String]): Map[Rate.Pair, Option[Rate]] =
-    currencyCodes
-      .map(parseCurrencyPairFromCode)
-      .foldRight(Map.empty[Rate.Pair, Option[Rate]])((elt: Rate.Pair, acc: Map[Rate.Pair, Option[Rate]]) => acc.updated(elt, None))
 
   private def parseCurrencyPairFromCode(codePair: String): Rate.Pair = {
     val codes = (codePair.substring(0, 3), codePair.substring(3, 6))
@@ -115,10 +109,10 @@ class QuoteCache(config: ForexConfig) {
 
   private def getErrorMessage(error: Throwable): String = error.toString
 
-  private def convertRateUri(currencyPairs: List[(String, String)]): Either[Error, Uri] =
+  private def convertRateUri(currencyPairs: List[Rate.Pair]): Either[Error, Uri] =
     Uri.fromString(config.host)
       .map(_.withPath("/convert")
-        .withQueryParam("pairs", currencyPairs.map(e => s"${e._1}${e._2}").mkString(","))
+        .withQueryParam("pairs", currencyPairs.map(e => s"${e.from}${e.to}").mkString(","))
         .withQueryParam("api_key", config.apiKey)
       )
       .leftMap(parseError => BadConfiguration(parseError.message))
@@ -134,10 +128,10 @@ class QuoteCache(config: ForexConfig) {
 
 object QuoteCache {
 
-  def create[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig): F[Cache[F, Rate.Pair, Option[Rate]]] = {
+  def create[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig): F[Cache[F, Rate.Pair, Rate]] = {
     val quoteRefresher = new QuoteCache(config.forex)
 
-    SelfRefreshingCache.create[F, Rate.Pair, Option[Rate]](Map.empty, quoteRefresher.refreshRatesCache[F], config.forex.dataExpiresIn)
+    SelfRefreshingCache.create[F, Rate.Pair, Rate](Map.empty, quoteRefresher.refreshRatesCache[F], config.forex.dataExpiresIn)
   }
 
 }

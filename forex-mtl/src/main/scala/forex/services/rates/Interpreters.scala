@@ -11,5 +11,5 @@ import forex.services.rates.oneforge.clients._
 object Interpreters {
   def dummy[F[_]: Applicative]: Algebra[F] = OneForgeInterpreter[F](OneForgeDummyClient[F])
 
-  def live[F[_]: ConcurrentEffect: Timer](implicit cache: Cache[F, Rate.Pair, Option[Rate]]): Algebra[F] = OneForgeInterpreter[F](OneForgeLiveClient[F])
+  def live[F[_]: ConcurrentEffect: Timer](implicit cache: Cache[F, Rate.Pair, Rate]): Algebra[F] = OneForgeInterpreter[F](OneForgeLiveClient[F])
 }

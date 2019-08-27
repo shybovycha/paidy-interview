@@ -3,6 +3,7 @@ package forex.services.rates.oneforge.cache
 import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 
+import cats.Applicative
 import cats.effect._
 import cats.implicits._
 import forex.config.ApplicationConfig
@@ -30,7 +31,7 @@ class QuoteCache(config: ForexConfig) {
 
   case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
 
-  def fetchPossiblePairs[F[_]: ConcurrentEffect]: F[Either[Error, Map[Rate.Pair, Option[Rate]]]] = {
+  private def fetchPossiblePairs[F[_]: ConcurrentEffect]: F[Either[Error, Map[Rate.Pair, Option[Rate]]]] = {
     symbolsUri.fold(
       error => Either.left[Error, Map[Rate.Pair, Option[Rate]]](error).pure[F],
       uri => oneForgeSymbols(uri)
@@ -38,12 +39,12 @@ class QuoteCache(config: ForexConfig) {
   }
 
   def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Option[Rate]]): F[Option[Map[Rate.Pair, Option[Rate]]]] = {
-    val currencyPairs: List[(String, String)] = existingRates.keySet.map(pair => (pair.from.toString, pair.to.toString)).toList
-
     val updateCache = (rates: List[Rate]) =>
       rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Option[Rate]]) => acc.updated(rate.pair, Some[Rate](rate)))
 
-    fetchQuotes(currencyPairs)
+    getCurrencyPairs[F](existingRates)
+      .map(_.keySet.map(pair => (pair.from.toString, pair.to.toString)).toList)
+      .flatMap(fetchQuotes(_))
       .map(_.toOption.map(_.map(quoteToRate)))
       .map(_.map(updateCache))
   }
@@ -53,6 +54,13 @@ class QuoteCache(config: ForexConfig) {
       error => Either.left[Error, List[QuoteDTO]](error).pure[F],
       uri => oneForgeConvertRate(uri)
     )
+
+  private def getCurrencyPairs[F[_]: Applicative: ConcurrentEffect](existingRates: Map[Rate.Pair, Option[Rate]]): F[Map[Rate.Pair, Option[Rate]]] =
+    if (existingRates.isEmpty) {
+      fetchPossiblePairs.map((e: Either[Error, Map[Rate.Pair, Option[Rate]]]) => e.getOrElse(Map.empty))
+    } else {
+      existingRates.pure[F]
+    }
 
   private def oneForgeConvertRate[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[QuoteDTO]]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
@@ -125,11 +133,7 @@ object QuoteCache {
   def create[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig): F[Cache[F, Rate.Pair, Option[Rate]]] = {
     val quoteRefresher = new QuoteCache(config.forex)
 
-    quoteRefresher.fetchPossiblePairs
-      .map(_.fold(Map.empty, identity))
-      .flatMap(initialCacheState =>
-        SelfRefreshingCache.create[F, Rate.Pair, Option[Rate]](initialCacheState, quoteRefresher.refreshRatesCache[F], config.forex.dataExpiresIn)
-      )
+    SelfRefreshingCache.create[F, Rate.Pair, Option[Rate]](Map.empty, quoteRefresher.refreshRatesCache[F], config.forex.dataExpiresIn)
   }
 
 }

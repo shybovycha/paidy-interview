@@ -21,12 +21,12 @@ private class SelfRefreshingCache[F[_]: Functor, K, V](state: Ref[F, Map[K, V]])
 
 object SelfRefreshingCache {
 
-  def create[F[_]: Concurrent: Timer, K, V](initialState: Map[K, V], refresher: Map[K, V] => F[Option[Map[K, V]]], timeout: FiniteDuration): F[Cache[F, K, V]] = {
+  def create[F[_]: Concurrent: Timer, K, V](initialState: Map[K, V], refresher: Map[K, V] => F[Map[K, V]], timeout: FiniteDuration): F[Cache[F, K, V]] = {
 
     def refreshRoutine(state: Ref[F, Map[K, V]]): F[Unit] = {
       val process = state.get
         .flatMap(refresher)
-        .flatMap(_.fold(state.get)(state.getAndSet))
+        .flatMap(state.getAndSet)
 
       process >> Timer[F].sleep(timeout) >> refreshRoutine(state)
     }

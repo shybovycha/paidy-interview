@@ -5,7 +5,7 @@ import java.util.concurrent.TimeoutException
 
 import cats.Applicative
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import forex.config.ApplicationConfig
 import forex.config.ForexConfig
 import forex.domain.Currency
@@ -41,20 +41,19 @@ class QuoteCache(config: ForexConfig) {
       )
   }
 
-  def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Rate]): F[Option[Map[Rate.Pair, Rate]]] = {
+  def refreshRatesCache[F[_]: ConcurrentEffect](existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] = {
     val updateCache = (rates: List[Rate]) =>
       rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Rate]) => acc.updated(rate.pair, rate))
 
     getCurrencyPairs[F](existingRates)
       .flatMap(fetchQuotes(_))
-      .map(_.toOption.map(_.map(quoteToRate)))
       .map(_.map(updateCache))
   }
 
-  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[Rate.Pair]): F[Error Either List[QuoteDTO]] =
+  private def fetchQuotes[F[_]: ConcurrentEffect](currencyPairs: List[Rate.Pair]): F[Error Either List[Rate]] =
     convertRateUri(currencyPairs)
       .fold(
-        error => Either.left[Error, List[QuoteDTO]](CanNotParseConvertUri(error.toString)).pure[F],
+        error => Either.left[Error, List[Rate]](CanNotParseConvertUri(error.toString)).pure[F],
         uri => oneForgeConvertRate(uri)
       )
 
@@ -65,14 +64,14 @@ class QuoteCache(config: ForexConfig) {
       existingRates.keySet.toList.pure[F]
     }
 
-  private def oneForgeConvertRate[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[QuoteDTO]]] = {
+  private def oneForgeConvertRate[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[Rate]]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
 
     BlazeClientBuilder[F](global)
       .resource
       .use(_.expect[List[QuoteDTO]](uri))
       .attempt
-      .map(_.leftMap(handleRefreshError))
+      .map(_.bimap(handleRefreshError, _.map(quoteToRate)))
   }
 
   private def oneForgeSymbols[F[_]: ConcurrentEffect](uri: Uri): F[Either[Error, List[Rate.Pair]]] = {

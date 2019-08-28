@@ -32,14 +32,6 @@ class QuoteCache[F[_]: ConcurrentEffect](config: ForexConfig) {
 
   case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
 
-  private def fetchPossiblePairs: F[Either[Error, List[Rate.Pair]]] = {
-    symbolsUri
-      .fold(
-        error => Either.left[Error, List[Rate.Pair]](CanNotParseSymbolsUri(error.toString)).pure[F],
-        uri => oneForgeSymbols(uri)
-      )
-  }
-
   def refreshRatesCache(existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] = {
     val updateCache = (rates: List[Rate]) =>
       rates.foldRight(existingRates)((rate: Rate, acc: Map[Rate.Pair, Rate]) => acc.updated(rate.pair, rate))
@@ -47,6 +39,14 @@ class QuoteCache[F[_]: ConcurrentEffect](config: ForexConfig) {
     getCurrencyPairs(existingRates)
       .flatMap(fetchQuotes)
       .map(_.map(updateCache))
+  }
+
+  private def fetchPossiblePairs: F[Either[Error, List[Rate.Pair]]] = {
+    symbolsUri
+      .fold(
+        error => Either.left[Error, List[Rate.Pair]](CanNotParseSymbolsUri(error.toString)).pure[F],
+        uri => oneForgeSymbols(uri)
+      )
   }
 
   private def fetchQuotes(currencyPairs: List[Rate.Pair]): F[Error Either List[Rate]] =

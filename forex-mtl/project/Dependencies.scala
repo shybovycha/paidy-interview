@@ -5,6 +5,7 @@ object Dependencies {
   object Versions {
     val cats                = "1.6.0"
     val catsEffect          = "1.2.0"
+    val catsMtl             = "0.6.0"
     val fs2                 = "1.0.4"
     val http4s              = "0.20.0-M1"
     val circe               = "0.11.1"
@@ -23,6 +24,7 @@ object Dependencies {
 
     lazy val cats                = "org.typelevel"         %% "cats-core"                  % Versions.cats
     lazy val catsEffect          = "org.typelevel"         %% "cats-effect"                % Versions.catsEffect
+    lazy val catsMtl             = "org.typelevel"         %% "cats-mtl-core"              % Versions.catsMtl
     lazy val fs2                 = "co.fs2"                %% "fs2-core"                   % Versions.fs2
 
     lazy val http4sDsl           = http4s("http4s-dsl")

@@ -13,9 +13,9 @@ object Errors {
   }
 
   def toProgramError(error: RatesServiceError): Error = error match {
-    case RatesServiceError.OneForgeLookupFailed(msg) => Error.RateLookupFailed(msg)
-    case RatesServiceError.NetworkFailure(msg) => Error.RateLookupFailed(msg)
-    case RatesServiceError.BadResponseFailure(msg) => Error.RateLookupFailed(msg)
+    case RatesServiceError.OneForgeLookupFailed(msg) => Error.RateLookupFailed(msg.getMessage)
+    case RatesServiceError.NetworkFailure(msg) => Error.RateLookupFailed(msg.getMessage)
+    case RatesServiceError.BadResponseFailure(msg) => Error.RateLookupFailed(msg.getMessage)
     case _ => Error.RateLookupFailed("Unknown error")
   }
 

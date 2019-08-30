@@ -33,7 +33,7 @@ object SelfRefreshingCache {
 
     Ref.of[F, Map[K, V]](initialState)
       .flatTap(refreshRoutine(_).start.void)
-      .map(SelfRefreshingCache[F, K, V])
+      .map(new SelfRefreshingCache[F, K, V](_))
 
   }
 

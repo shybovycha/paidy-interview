@@ -35,7 +35,7 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
     symbolsUri
       .fold(
         error => ce.raiseError[List[Rate.Pair]](CanNotParseSymbolsUri(error)),
-        uri => oneForgeSymbols(uri)
+        uri => oneForgeSymbols(uri).map(_.map(parseCurrencyPairFromCode))
       )
   }
 
@@ -43,27 +43,25 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
     convertRateUri(currencyPairs)
       .fold(
         error => ce.raiseError[List[Rate]](CanNotParseConvertUri(error)),
-        uri => oneForgeConvertRate(uri)
+        uri => oneForgeConvertRate(uri).map(_.map(quoteToRate))
       )
 
-  private def oneForgeConvertRate(uri: Uri): F[List[Rate]] = {
+  private def oneForgeConvertRate(uri: Uri): F[List[QuoteDTO]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
 
     BlazeClientBuilder[F](global)
       .resource
       .use(_.expect[List[QuoteDTO]](uri))
       .handleErrorWith(error => ce.raiseError[List[QuoteDTO]](handleHttpError(error)))
-      .map(_.map(quoteToRate))
   }
 
-  private def oneForgeSymbols(uri: Uri): F[List[Rate.Pair]] = {
+  private def oneForgeSymbols(uri: Uri): F[List[String]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
 
     BlazeClientBuilder[F](global)
       .resource
       .use(_.expect[List[String]](uri))
       .handleErrorWith(error => ce.raiseError[List[String]](handleHttpError(error)))
-      .map(_.map(parseCurrencyPairFromCode))
   }
 
   private def convertRateUri(currencyPairs: List[Rate.Pair]): Error Either Uri =

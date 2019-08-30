@@ -9,7 +9,7 @@ import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
 
-private class SelfRefreshingCache[F[_]: Functor, K, V](state: Ref[F, Map[K, V]]) extends Cache[F, K, V] {
+class SelfRefreshingCache[F[_]: Functor, K, V](state: Ref[F, Map[K, V]]) extends Cache[F, K, V] {
 
   override def get(key: K): F[Option[V]] =
     state.get.map(_.get(key))
@@ -21,20 +21,23 @@ private class SelfRefreshingCache[F[_]: Functor, K, V](state: Ref[F, Map[K, V]])
 
 object SelfRefreshingCache {
 
-  def create[F[_]: Concurrent: Timer, K, V](initialState: Map[K, V], refresher: Map[K, V] => F[Map[K, V]], timeout: FiniteDuration): F[Cache[F, K, V]] = {
+  def createCache[F[_]: Concurrent: Timer, K, V](initialState: Map[K, V], refresher: Map[K, V] => F[Map[K, V]], trigger: F[Unit]): F[Cache[F, K, V]] = {
 
     def refreshRoutine(state: Ref[F, Map[K, V]]): F[Unit] = {
       val process = state.get
         .flatMap(refresher)
         .flatMap(state.getAndSet)
 
-      process >> Timer[F].sleep(timeout) >> refreshRoutine(state)
+      process >> trigger >> refreshRoutine(state)
     }
 
     Ref.of[F, Map[K, V]](initialState)
       .flatTap(refreshRoutine(_).start.void)
-      .map(new SelfRefreshingCache[F, K, V](_))
+      .map(SelfRefreshingCache[F, K, V])
 
   }
+
+  def createRepeatedTrigger[F[_]: Timer](timeout: FiniteDuration): F[Unit] =
+    Timer[F].sleep(timeout)
 
 }

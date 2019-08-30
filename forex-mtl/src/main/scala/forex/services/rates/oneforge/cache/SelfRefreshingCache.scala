@@ -21,7 +21,7 @@ class SelfRefreshingCache[F[_]: Functor, K, V](state: Ref[F, Map[K, V]]) extends
 
 object SelfRefreshingCache {
 
-  def createCache[F[_]: Concurrent: Timer, K, V](initialState: Map[K, V], refresher: Map[K, V] => F[Map[K, V]], trigger: F[Unit]): F[Cache[F, K, V]] = {
+  def createCache[F[_]: Concurrent, K, V](initialState: Map[K, V], refresher: Map[K, V] => F[Map[K, V]], trigger: F[Unit]): F[Cache[F, K, V]] = {
 
     def refreshRoutine(state: Ref[F, Map[K, V]]): F[Unit] = {
       val process = state.get

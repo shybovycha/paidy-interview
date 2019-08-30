@@ -27,11 +27,18 @@ scalacOptions ++= Seq(
   "-Ywarn-value-discard"
 )
 
+//testOptions in Test += Tests.Argument(
+//  TestFrameworks.ScalaTest,
+//  "-oD",
+//  "-y", "org.scalatest.FunSpec"
+//)
+
 resolvers +=
   "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= Seq(
   compilerPlugin(Libraries.kindProjector),
+//  compilerPlugin(Libraries.supersafe),
   Libraries.cats,
   Libraries.catsEffect,
   Libraries.fs2,
@@ -47,7 +54,10 @@ libraryDependencies ++= Seq(
   Libraries.circeJava8,
   Libraries.pureConfig,
   Libraries.logback,
-  Libraries.scalaTest        % Test,
-  Libraries.scalaCheck       % Test,
-  Libraries.catsScalaCheck   % Test
+  Libraries.scalaTest           % Test,
+  Libraries.scalaCheck          % Test,
+  Libraries.catsScalaCheck      % Test,
+  Libraries.catsLaws            % Test,
+  Libraries.shapeless           % Test,
+//  Libraries.disciplineScalaTest % Test
 )

@@ -28,11 +28,10 @@ case class QuoteDTO(symbol: String, price: Double)
 
 class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: MonadError[F, Throwable]) {
 
-  def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] = {
+  def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] =
     symbolsUri
       .flatMap(fetcher)
       .map(_.map(parseCurrencyPairFromCode))
-  }
 
   def fetchQuotes(currencyPairs: List[Rate.Pair], fetcher: Uri => F[List[QuoteDTO]]): F[List[Rate]] =
     convertRateUri(currencyPairs)

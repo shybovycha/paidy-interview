@@ -31,7 +31,7 @@ class OneForgeLiveClientTest extends FunSuite {
   test("#fetchQuotes converts all the currencies passed") {
     val client = new OneForgeLiveClient[IO](config)
 
-    val fetcher = (_: Uri) => IO(List(QuoteDTO("AUDJPY", 700.0)))
+    val fetcher = (_: Uri) => IO(List(QuoteDTO("AUDJPY", 70.0)))
     val currencyPairs = List(Rate.Pair(Currency.AUD, Currency.JPY))
 
     // TODO: this will be updated at convert time and thus might fail / flake

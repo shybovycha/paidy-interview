@@ -65,7 +65,7 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: MonadError[F, T
 
   private[cache] def quoteToRate(quote: QuoteDTO): Rate = {
     val pair = parseCurrencyPairFromCode(quote.symbol)
-    val price = Price(quote.price * 100)
+    val price = Price(quote.price)
     val timestamp = Timestamp.now
 
     Rate(pair, price, timestamp)

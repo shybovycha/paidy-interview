@@ -5,7 +5,6 @@ import cats.effect.concurrent.Ref
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.global
 
 class SelfRefreshingCacheTest extends FunSuite {
@@ -26,18 +25,11 @@ class SelfRefreshingCacheTest extends FunSuite {
     SelfRefreshingCache.createCache[IO, String, Int](initialState, refreshingRoutine)
 
   test("#get returns Some for existing value") {
-    /*
-      Just a few notes on this line:
-
-      1. `unsafeRunTimed(duration)` prevents a memory leak when the routines never stop, even after test finishes
-      2. the outer `Some()` comes from p.1 - `unsafeRunTimed` returns an `Option`
-     */
-
-    cacheIO.flatMap(c => c.get("existing")).unsafeRunTimed(10.seconds) should be (Some(Some(42)))
+    cacheIO.flatMap(c => c.get("existing")).unsafeRunSync() should be (Some(42))
   }
 
   test("#get returns None for non-existing value") {
-    cacheIO.flatMap(c => c.get("incognito")).unsafeRunTimed(10.seconds) should be (Some(None))
+    cacheIO.flatMap(c => c.get("incognito")).unsafeRunSync() should be (None)
   }
 
   test("#get after #put returns new value") {
@@ -47,11 +39,11 @@ class SelfRefreshingCacheTest extends FunSuite {
       newValue <- cache.get("extravaganza")
     } yield newValue
 
-    newCacheIO.unsafeRunTimed(10.seconds) should be(Some(Some(7)))
+    newCacheIO.unsafeRunSync() should be(Some(7))
   }
 
   test("refresher function updates the value") {
-    cacheIO.flatMap(c => c.get("burrito")).unsafeRunTimed(10.seconds) should be (Some(Some(-14)))
+    cacheIO.flatMap(c => c.get("burrito")).unsafeRunSync() should be (Some(-14))
   }
 
 }

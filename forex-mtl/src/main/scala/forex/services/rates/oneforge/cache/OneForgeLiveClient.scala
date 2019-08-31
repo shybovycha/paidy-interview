@@ -10,7 +10,6 @@ import forex.domain.Currency
 import forex.domain.Price
 import forex.domain.Rate
 import forex.domain.Timestamp
-import forex.services.rates.Errors.Error.BadConfiguration
 import forex.services.rates.Errors.Error.BadResponseFailure
 import forex.services.rates.Errors.Error.CanNotParseConvertUri
 import forex.services.rates.Errors.Error.CanNotParseSymbolsUri
@@ -33,18 +32,14 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
 
   def fetchPossiblePairs: F[List[Rate.Pair]] = {
     symbolsUri
-      .fold(
-        error => ce.raiseError[List[Rate.Pair]](CanNotParseSymbolsUri(error)),
-        uri => oneForgeSymbols(uri).map(_.map(parseCurrencyPairFromCode))
-      )
+      .flatMap(oneForgeSymbols)
+      .map(_.map(parseCurrencyPairFromCode))
   }
 
   def fetchQuotes(currencyPairs: List[Rate.Pair]): F[List[Rate]] =
     convertRateUri(currencyPairs)
-      .fold(
-        error => ce.raiseError[List[Rate]](CanNotParseConvertUri(error)),
-        uri => oneForgeConvertRate(uri).map(_.map(quoteToRate))
-      )
+      .flatMap(oneForgeConvertRate)
+      .map(_.map(quoteToRate))
 
   private def oneForgeConvertRate(uri: Uri): F[List[QuoteDTO]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
@@ -64,20 +59,26 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
       .handleErrorWith(error => ce.raiseError[List[String]](handleHttpError(error)))
   }
 
-  private[cache] def convertRateUri(currencyPairs: List[Rate.Pair]): Error Either Uri =
+  private[cache] def convertRateUri(currencyPairs: List[Rate.Pair]): F[Uri] =
     Uri.fromString(config.host)
       .map(_.withPath("/convert")
         .withQueryParam("pairs", currencyPairs.map(e => s"${e.from}${e.to}").mkString(","))
         .withQueryParam("api_key", config.apiKey)
       )
-      .leftMap(BadConfiguration)
+      .fold(
+        error => ce.raiseError[Uri](CanNotParseConvertUri(error)),
+        uri => uri.pure[F]
+      )
 
-  private[cache] def symbolsUri: Error Either Uri =
+  private[cache] def symbolsUri: F[Uri] =
     Uri.fromString(config.host)
       .map(_.withPath("/symbols")
         .withQueryParam("api_key", config.apiKey)
       )
-      .leftMap(BadConfiguration)
+      .fold(
+        error => ce.raiseError[Uri](CanNotParseSymbolsUri(error)),
+        uri => uri.pure[F]
+      )
 
   private[cache] def quoteToRate(quote: QuoteDTO): Rate = {
     val pair = parseCurrencyPairFromCode(quote.symbol)

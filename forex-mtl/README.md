@@ -75,6 +75,10 @@ to pick up the data when API recovers.
 
 It also might be worth logging errors whenever they occur in request processing time.
 
+The other thing I was thinking about whilst implementing this solution was using `ApplicativeHandle`, but asking around
+showed that it has no implementation for `IO` in `cats-effects` just yet, so I trashed that idea. Currently I am using
+`MonadError` instead, which throws an error, so maybe it would be worth catching it at some point with `handleErrorWith`? 
+
 ### Testing
 
 Could add more integration tests to cover the API overall, not just core parts of logic.

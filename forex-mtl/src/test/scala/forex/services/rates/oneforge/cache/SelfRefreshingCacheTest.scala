@@ -5,6 +5,7 @@ import cats.syntax.all._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.global
 
 class SelfRefreshingCacheTest extends FunSuite {
@@ -20,11 +21,11 @@ class SelfRefreshingCacheTest extends FunSuite {
     SelfRefreshingCache.createCache[IO, String, Int](initialState, refresher, trigger)
 
   test("#get returns Some for existing value") {
-    (cacheIO >>= (c => c.get("existing"))).unsafeRunSync() should be(Some(42))
+    cacheIO.flatMap(c => c.get("existing")).unsafeRunTimed(10.seconds) should be (Some(Some(42)))
   }
 
   test("#get returns None for non-existing value") {
-    (cacheIO >>= (c => c.get("incognito"))).unsafeRunSync() should be(None)
+    cacheIO.flatMap(c => c.get("incognito")).unsafeRunTimed(10.seconds) should be (Some(None))
   }
 
   // TODO: have to figure out how to trigger the `Concurrent#sync` execution
@@ -35,12 +36,11 @@ class SelfRefreshingCacheTest extends FunSuite {
       newValue <- cache.get("extravaganza")
     } yield newValue
 
-    newCacheIO.unsafeRunSync() should be(Some(42))
+    newCacheIO.unsafeRunTimed(10.seconds) should be(Some(Some(7)))
   }
 
-  // TODO: have to figure out how to trigger the `Concurrent#sync` execution
-  ignore("refresher function updates the value") {
-    (cacheIO >>= (c => c.get("burrito"))).unsafeRunSync() should be(Some(-14))
+  test("refresher function updates the value") {
+    cacheIO.flatMap(c => c.get("burrito")).unsafeRunTimed(10.seconds) should be (Some(Some(-14)))
   }
 
 }

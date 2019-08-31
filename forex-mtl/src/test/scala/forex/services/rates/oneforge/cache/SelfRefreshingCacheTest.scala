@@ -16,8 +16,11 @@ class SelfRefreshingCacheTest extends FunSuite {
   implicit val cs    = IO.contextShift(global)
   implicit val timer = IO.timer(global)
 
-  val refreshingRoutine =
-    (state: Ref[IO, Map[String, Int]]) => state.get.flatMap(refresher).flatMap(state.getAndSet).flatMap(_ => IO.unit)
+  val refreshingRoutine = (state: Ref[IO, Map[String, Int]]) =>
+    state.get
+      .flatMap(refresher)
+      .flatMap(state.getAndSet)
+      .flatMap(_ => IO.unit)
 
   val cacheIO: IO[Cache[IO, String, Int]] =
     SelfRefreshingCache.createCache[IO, String, Int](initialState, refreshingRoutine)

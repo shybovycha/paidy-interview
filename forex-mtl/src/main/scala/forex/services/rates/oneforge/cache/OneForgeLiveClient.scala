@@ -64,7 +64,7 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
       .handleErrorWith(error => ce.raiseError[List[String]](handleHttpError(error)))
   }
 
-  private def convertRateUri(currencyPairs: List[Rate.Pair]): Error Either Uri =
+  private[cache] def convertRateUri(currencyPairs: List[Rate.Pair]): Error Either Uri =
     Uri.fromString(config.host)
       .map(_.withPath("/convert")
         .withQueryParam("pairs", currencyPairs.map(e => s"${e.from}${e.to}").mkString(","))
@@ -72,14 +72,14 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
       )
       .leftMap(BadConfiguration)
 
-  private def symbolsUri: Error Either Uri =
+  private[cache] def symbolsUri: Error Either Uri =
     Uri.fromString(config.host)
       .map(_.withPath("/symbols")
         .withQueryParam("api_key", config.apiKey)
       )
       .leftMap(BadConfiguration)
 
-  private def quoteToRate(quote: QuoteDTO): Rate = {
+  private[cache] def quoteToRate(quote: QuoteDTO): Rate = {
     val pair = parseCurrencyPairFromCode(quote.symbol)
     val price = Price(quote.price * 100)
     val timestamp = Timestamp.now
@@ -87,13 +87,13 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
     Rate(pair, price, timestamp)
   }
 
-  private def parseCurrencyPairFromCode(codePair: String): Rate.Pair = {
+  private[cache] def parseCurrencyPairFromCode(codePair: String): Rate.Pair = {
     val codes = (codePair.substring(0, 3), codePair.substring(3, 6))
 
     Rate.Pair(Currency.fromString(codes._1), Currency.fromString(codes._2))
   }
 
-  private def handleHttpError(error: Throwable): Error = error match {
+  private[cache] def handleHttpError(error: Throwable): Error = error match {
     case _: TimeoutException => NetworkFailure(error)
     case _: ConnectException => NetworkFailure(error)
     case _: InvalidMessageBodyFailure => BadResponseFailure(error)

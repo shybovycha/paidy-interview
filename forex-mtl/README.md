@@ -4,7 +4,29 @@
 
 This is my interpretation and implementation of forex-mtl.
 
-The original task constraints 
+The original task and constraints were:
+
+> An internal user of the application should be able to ask for an exchange rate between 
+> 2 given currencies, and get back a rate that is not older than 5 minutes.
+> The application should at least support 10.000 requests per day.
+>
+> In practice, this should require the following 2 points:
+>
+> 1. Create a live interpreter for the oneforge service. This should consume the 1forge API, and do so using the free tier.
+> 2. Adapt the rates processes (if necessary) to make sure you cover the requirements of the use case, and work around possible limitations of the third-party provider.
+> 3. Make sure the service's own API gets updated to reflect the changes you made in point 1 & 2.
+
+Current implementation relies strictly on cached data and refreshing the cache every 5 minutes
+(in order to keep the data not older than 5 minutes). OneForge free 14-day trial (aka Starter tier)
+allows for 5000 requests per day. Current implementation will make 12 calls per hour or 288 calls per day.
+Retrieving data from cache is extremely cheap, so the amount of daily requests to the application
+will only be limited by the server capabilities, not by the pricing plan of OneForge.
+
+In order to make application as flexible as possible, one can fine-tune both the API base URL
+and the frequency of updates by changing the corresponding params in the `application.conf` file.
+
+If users desire to substitute OneForge API with some other implementation (like in my case - the mock API),
+they mush ensure the API is aligned with OneForge's `/quotes` and `/symbols` endpoints' contracts. 
 
 ## Some decisions made
 
@@ -34,3 +56,20 @@ cache expiration timeout from the config file, `application.conf`, the `forex` s
 
 This project is not fully tagless, so it uses the classic dependency-injection-like approach of instantiating the
 specific classes (in this case - `live` or `dummy`) and then passing them around.
+
+### API
+
+I've implemented a stub API in Ruby to not hit the real 1Forge API.
+This way I can control the responses and the server status to check the application behaviour in those scenarios.
+
+## Whould could be done differently
+
+### Error handling
+
+There could be lot of things done differently in this regards.
+For instance, when an API is down, it might be worth reducing the cache refresh cooldown time
+to pick up the data when API recovers.
+
+It also might be worth logging errors whenever they occur in request processing time.
+
+

@@ -50,13 +50,12 @@ class OneForgeLiveClientTest extends FunSuite {
   }
 
   test("#convertRateUri returns CanNotParseConvertUri when unable to parse URI") {
-    val brokenConfig = ForexConfig(host = "123", apiKey = "?api?key", dataExpiresIn = 1.second)
+    val brokenConfig = ForexConfig(host = "zzpt:\\\\1::2:3:::4", apiKey = "?api?key", dataExpiresIn = 1.second)
     val client = new OneForgeLiveClient[IO](brokenConfig)
 
     val currencyPairs = List(Rate.Pair(Currency.AUD, Currency.JPY))
 
-    // TODO: check the MonadError rather than `not be`
-    client.convertRateUri(currencyPairs).unsafeRunSync().toString() should not be ("123/convert?pairs=AUDJPY&api_key=?api?key")
+    a [CanNotParseConvertUri] should be thrownBy client.convertRateUri(currencyPairs).unsafeRunSync()
   }
 
   test("#symbolsUri constructs URI from configuration passed") {
@@ -85,10 +84,9 @@ class OneForgeLiveClientTest extends FunSuite {
   }
 
   ignore("#parseCurrencyPairFromCode returns error when unable to parse response string") {
-    // val client = new OneForgeLiveClient[IO](config)
+     val client = new OneForgeLiveClient[IO](config)
 
-    // TODO: what should it be then?
-    // client.parseCurrencyPairFromCode("123456") should not be isInstanceOf[Rate.Pair]
+    a [CanNotParseSymbolsUri] should be thrownBy client.parseCurrencyPairFromCode("123456")
   }
 
   test("#handleHttpError converts timeout exception to error") {

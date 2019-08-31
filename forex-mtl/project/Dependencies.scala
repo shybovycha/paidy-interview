@@ -15,7 +15,6 @@ object Dependencies {
     val scalaCheck          = "1.14.0"
     val scalaTest           = "3.0.7"
     val catsScalaCheck      = "0.1.1"
-    val supersafe           = "1.1.3"
   }
 
   object Libraries {
@@ -48,7 +47,6 @@ object Dependencies {
     lazy val scalaTest           = "org.scalatest"         %% "scalatest"                  % Versions.scalaTest
     lazy val scalaCheck          = "org.scalacheck"        %% "scalacheck"                 % Versions.scalaCheck
     lazy val catsScalaCheck      = "io.chrisdavenport"     %% "cats-scalacheck"            % Versions.catsScalaCheck
-    lazy val supersafe           = "com.artima.supersafe"  %% "sbtplugin"                  % Versions.supersafe
   }
 
 }

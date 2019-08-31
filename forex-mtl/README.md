@@ -28,6 +28,9 @@ and the frequency of updates by changing the corresponding params in the `applic
 If users desire to substitute OneForge API with some other implementation (like in my case - the mock API),
 they mush ensure the API is aligned with OneForge's `/quotes` and `/symbols` endpoints' contracts. 
 
+I am not 100% sure about the `rates processes` part of the requirements (is it `/quotes` endpoint of 1forge API?),
+but other than that I feel the implementation covers everything else.
+
 ## Some decisions made
 
 ### `Cache` and `SelfRefreshingCache`
@@ -62,7 +65,7 @@ specific classes (in this case - `live` or `dummy`) and then passing them around
 I've implemented a stub API in Ruby to not hit the real 1Forge API.
 This way I can control the responses and the server status to check the application behaviour in those scenarios.
 
-## Whould could be done differently
+## What could be done differently
 
 ### Error handling
 
@@ -72,4 +75,6 @@ to pick up the data when API recovers.
 
 It also might be worth logging errors whenever they occur in request processing time.
 
+### Testing
 
+Could add more integration tests to cover the API overall, not just core parts of logic.

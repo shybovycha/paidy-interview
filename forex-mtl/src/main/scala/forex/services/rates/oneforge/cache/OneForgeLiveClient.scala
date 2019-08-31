@@ -7,10 +7,7 @@ import cats.MonadError
 import cats.effect._
 import cats.implicits._
 import forex.config.ForexConfig
-import forex.domain.Currency
-import forex.domain.Price
-import forex.domain.Rate
-import forex.domain.Timestamp
+import forex.domain._
 import forex.services.rates.Errors.Error.BadResponseFailure
 import forex.services.rates.Errors.Error.CanNotParseConvertUri
 import forex.services.rates.Errors.Error.CanNotParseSymbolsUri

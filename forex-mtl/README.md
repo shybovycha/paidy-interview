@@ -77,7 +77,10 @@ It also might be worth logging errors whenever they occur in request processing 
 
 The other thing I was thinking about whilst implementing this solution was using `ApplicativeHandle`, but asking around
 showed that it has no implementation for `IO` in `cats-effects` just yet, so I trashed that idea. Currently I am using
-`MonadError` instead, which throws an error, so maybe it would be worth catching it at some point with `handleErrorWith`? 
+`MonadError` instead, which throws an error, so maybe it would be worth catching it at some point with `handleErrorWith`?
+
+Also worth mentioning parsing `Currency` from `String` would not handle case when the currency code does not exist. 
+Have to come up with a reasonable way to handle that. 
 
 ### Testing
 

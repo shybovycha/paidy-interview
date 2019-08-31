@@ -34,10 +34,7 @@ class OneForgeLiveClientTest extends FunSuite {
     val fetcher = (_: Uri) => IO(List(QuoteDTO("AUDJPY", 70.0)))
     val currencyPairs = List(Rate.Pair(Currency.AUD, Currency.JPY))
 
-    // TODO: this will be updated at convert time and thus might fail / flake
-    val timestamp = Timestamp.now
-
-    client.fetchQuotes(currencyPairs, fetcher).unsafeRunSync() should contain only (Rate(Rate.Pair(Currency.AUD, Currency.JPY), Price(70.0), timestamp))
+    all (client.fetchQuotes(currencyPairs, fetcher).unsafeRunSync()) should (have ('pair (Rate.Pair(Currency.AUD, Currency.JPY)), 'price (70.0)))
   }
 
   ignore("not testing #oneForgeConvertRate since this would only test http4s client which we do not want to test ourselves") {}
@@ -78,10 +75,7 @@ class OneForgeLiveClientTest extends FunSuite {
   test("#quoteToRate extracts Rate from QuoteDTO response object") {
     val client = new OneForgeLiveClient[IO](config)
 
-    // TODO: this will be updated at convert time and thus might fail / flake
-    val timestamp = Timestamp.now
-
-    client.quoteToRate(QuoteDTO(symbol = "AUDJPY", price = 71.0)) should be (Rate(Rate.Pair(Currency.AUD, Currency.JPY), Price(71.0), timestamp))
+    client.quoteToRate(QuoteDTO(symbol = "AUDJPY", price = 71.0)) should have ( 'pair (Rate.Pair(Currency.AUD, Currency.JPY)), 'price (71.0) )
   }
 
   test("#parseCurrencyPairFromCode extracts pair of currencies from string response") {

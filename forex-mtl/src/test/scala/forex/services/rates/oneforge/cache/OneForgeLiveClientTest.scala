@@ -49,7 +49,7 @@ class OneForgeLiveClientTest extends FunSuite {
 
     val currencyPairs = List(Rate.Pair(Currency.AUD, Currency.JPY))
 
-    client.convertRateUri(currencyPairs).unsafeRunSync() should be ("http://example.com/convert?pairs=AUDJPY&api_key=TEST_API_KEY")
+    client.convertRateUri(currencyPairs).unsafeRunSync().toString() should be ("http://example.com/convert?pairs=AUDJPY&api_key=TEST_API_KEY")
   }
 
   test("#convertRateUri returns CanNotParseConvertUri when unable to parse URI") {
@@ -59,13 +59,13 @@ class OneForgeLiveClientTest extends FunSuite {
     val currencyPairs = List(Rate.Pair(Currency.AUD, Currency.JPY))
 
     // TODO: check the MonadError rather than `not be`
-    client.convertRateUri(currencyPairs).unsafeRunSync() should not be ("123/convert?pairs=AUDJPY&api_key=?api?key")
+    client.convertRateUri(currencyPairs).unsafeRunSync().toString() should not be ("123/convert?pairs=AUDJPY&api_key=?api?key")
   }
 
   test("#symbolsUri constructs URI from configuration passed") {
     val client = new OneForgeLiveClient[IO](config)
 
-    client.symbolsUri.unsafeRunSync() should be ("http://example.com/symbols?api_key=TEST_API_KEY")
+    client.symbolsUri.unsafeRunSync().toString() should be ("http://example.com/symbols?api_key=TEST_API_KEY")
   }
 
   test("#symbolsUri returns CanNotParseSymbolsUri when unable to parse URI") {
@@ -73,7 +73,7 @@ class OneForgeLiveClientTest extends FunSuite {
     val client = new OneForgeLiveClient[IO](brokenConfig)
 
     // TODO: check the MonadError rather than `not be`
-    client.symbolsUri.unsafeRunSync() should not be ("123/convert?api_key=?api?key")
+    client.symbolsUri.unsafeRunSync().toString() should not be ("123/convert?api_key=?api?key")
   }
 
   test("#quoteToRate extracts Rate from QuoteDTO response object") {

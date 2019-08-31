@@ -69,11 +69,10 @@ class OneForgeLiveClientTest extends FunSuite {
   }
 
   test("#symbolsUri returns CanNotParseSymbolsUri when unable to parse URI") {
-    val brokenConfig = ForexConfig(host = "123", apiKey = "?api?key", dataExpiresIn = 1.second)
+    val brokenConfig = ForexConfig(host = "zzppt:\\\\1:2::3:::4", apiKey = "?api?key", dataExpiresIn = 1.second)
     val client = new OneForgeLiveClient[IO](brokenConfig)
 
-    // TODO: check the MonadError rather than `not be`
-    client.symbolsUri.unsafeRunSync().toString() should not be ("123/convert?api_key=?api?key")
+    a [CanNotParseSymbolsUri] should be thrownBy client.symbolsUri.unsafeRunSync()
   }
 
   test("#quoteToRate extracts Rate from QuoteDTO response object") {

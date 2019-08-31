@@ -10,7 +10,7 @@ import scala.concurrent.duration.FiniteDuration
 object QuoteCache {
 
   def create[F[_]: ConcurrentEffect: Timer](client: OneForgeLiveClient[F], dataExpiresIn: FiniteDuration): F[Cache[F, Rate.Pair, Rate]] =
-    SelfRefreshingCache.createCache[F, Rate.Pair, Rate](Map.empty, refreshRatesCache[F](client), SelfRefreshingCache.createRepeatedTrigger(dataExpiresIn))
+    SelfRefreshingCache.createCache[F, Rate.Pair, Rate](Map.empty, SelfRefreshingCache.createRecursiveRefresher(refreshRatesCache[F](client), SelfRefreshingCache.createRepeatedTrigger(dataExpiresIn)))
 
   def refreshRatesCache[F[_]: ConcurrentEffect](client: OneForgeLiveClient[F])(existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] =
     getCurrencyPairs[F](client, existingRates)

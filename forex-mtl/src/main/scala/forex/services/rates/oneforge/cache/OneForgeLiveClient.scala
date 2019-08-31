@@ -3,6 +3,7 @@ package forex.services.rates.oneforge.cache
 import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 
+import cats.MonadError
 import cats.effect._
 import cats.implicits._
 import forex.config.ForexConfig
@@ -26,38 +27,20 @@ import org.http4s.client.blaze.BlazeClientBuilder
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffect[F]) {
+case class QuoteDTO(symbol: String, price: Double)
 
-  case class QuoteDTO(symbol: String, price: Double, timestamp: Int)
+class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: MonadError[F, Throwable]) {
 
-  def fetchPossiblePairs: F[List[Rate.Pair]] = {
+  def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] = {
     symbolsUri
-      .flatMap(oneForgeSymbols)
+      .flatMap(fetcher)
       .map(_.map(parseCurrencyPairFromCode))
   }
 
-  def fetchQuotes(currencyPairs: List[Rate.Pair]): F[List[Rate]] =
+  def fetchQuotes(currencyPairs: List[Rate.Pair], fetcher: Uri => F[List[QuoteDTO]]): F[List[Rate]] =
     convertRateUri(currencyPairs)
-      .flatMap(oneForgeConvertRate)
+      .flatMap(fetcher)
       .map(_.map(quoteToRate))
-
-  private def oneForgeConvertRate(uri: Uri): F[List[QuoteDTO]] = {
-    implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
-
-    BlazeClientBuilder[F](global)
-      .resource
-      .use(_.expect[List[QuoteDTO]](uri))
-      .handleErrorWith(error => ce.raiseError[List[QuoteDTO]](handleHttpError(error)))
-  }
-
-  private def oneForgeSymbols(uri: Uri): F[List[String]] = {
-    implicit val quoteListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
-
-    BlazeClientBuilder[F](global)
-      .resource
-      .use(_.expect[List[String]](uri))
-      .handleErrorWith(error => ce.raiseError[List[String]](handleHttpError(error)))
-  }
 
   private[cache] def convertRateUri(currencyPairs: List[Rate.Pair]): F[Uri] =
     Uri.fromString(config.host)
@@ -92,6 +75,28 @@ class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: ConcurrentEffec
     val codes = (codePair.substring(0, 3), codePair.substring(3, 6))
 
     Rate.Pair(Currency.fromString(codes._1), Currency.fromString(codes._2))
+  }
+
+}
+
+object OneForgeLiveClient {
+
+  private[cache] def oneForgeConvertRate[F[_]](uri: Uri)(implicit ce: ConcurrentEffect[F]): F[List[QuoteDTO]] = {
+    implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
+
+    BlazeClientBuilder[F](global)
+      .resource
+      .use(_.expect[List[QuoteDTO]](uri))
+      .handleErrorWith(error => ce.raiseError[List[QuoteDTO]](handleHttpError(error)))
+  }
+
+  private[cache] def oneForgeSymbols[F[_]](uri: Uri)(implicit ce: ConcurrentEffect[F]): F[List[String]] = {
+    implicit val quoteListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
+
+    BlazeClientBuilder[F](global)
+      .resource
+      .use(_.expect[List[String]](uri))
+      .handleErrorWith(error => ce.raiseError[List[String]](handleHttpError(error)))
   }
 
   private[cache] def handleHttpError(error: Throwable): Error = error match {

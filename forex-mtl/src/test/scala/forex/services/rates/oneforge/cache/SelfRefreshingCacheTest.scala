@@ -23,6 +23,13 @@ class SelfRefreshingCacheTest extends FunSuite {
     SelfRefreshingCache.createCache[IO, String, Int](initialState, refreshingRoutine)
 
   test("#get returns Some for existing value") {
+    /*
+      Just a few notes on this line:
+
+      1. `unsafeRunTimed(duration)` prevents a memory leak when the routines never stop, even after test finishes
+      2. the outer `Some()` comes from p.1 - `unsafeRunTimed` returns an `Option`
+     */
+
     cacheIO.flatMap(c => c.get("existing")).unsafeRunTimed(10.seconds) should be (Some(Some(42)))
   }
 

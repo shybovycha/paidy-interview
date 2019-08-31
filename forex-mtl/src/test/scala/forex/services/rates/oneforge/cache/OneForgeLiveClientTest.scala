@@ -2,11 +2,9 @@ package forex.services.rates.oneforge.cache
 
 import java.net.ConnectException
 
-import cats.MonadError
 import cats.effect.IO
 import forex.config.ForexConfig
 import forex.domain._
-import forex.services.rates.Errors
 import forex.services.rates.Errors.Error._
 import org.http4s.InvalidMessageBodyFailure
 import org.http4s.Status
@@ -19,8 +17,6 @@ import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 
 class OneForgeLiveClientTest extends FunSuite {
-
-  implicit val me: MonadError[IO, Errors.Error] = ???
 
   val config = ForexConfig(host = "http://example.com", apiKey = "TEST_API_KEY", dataExpiresIn = 5.minutes)
 

@@ -65,6 +65,31 @@ specific classes (in this case - `live` or `dummy`) and then passing them around
 I've implemented a stub API in Ruby to not hit the real 1Forge API.
 This way I can control the responses and the server status to check the application behaviour in those scenarios.
 
+### Testing
+
+I was considering testing with `Discipline`, but failed terribly. Hence I've decided to stay close to MTL, but test
+with conventional Scala tools. This led to few test scenarios for core pieces of application 
+(the ones which make sense to test, not the 3rd party libraries) - `SelfRefreshingCache`, `OneForgeLiveClient` and
+the more integration-ish test for `OneForgeLiveService` (combining the above two).
+
+Since `SelfRefreshingCache` originally had everything in it (check the commits history for reference, if you are keen),
+it was hard to come up with a sane approach to testing it. Hence I've pulled out as much stuff as possible and parametrized
+whatever made sense. That's where the APIs in the form they are now come from.
+
+Decoupling the timer _trigger_ and cache _refreshing routine_, for instance, allowed me to stub / mock those behaviours
+and thus test the cache itself, not the `Timer` from cats.
+
+One more important note is: previously, since all the timer logic was stuffed into the `SelfRefreshingCache` itself,
+every time I was running tests, my whole SBT console would go stuck and laptop would start taking off. It was most
+likely caused by the fact that I've used a separate thread to start cache refreshing routine
+(specifically important for tests), and it never stopped (even when tests were done).
+
+In my desperate try to prevent that, I've used `unsafeRunTimed(10.seconds)` so that routines would stop themselves.
+It caused my assertions look funny
+(`subjectIO.unsafeRunTimed(10.seconds) should be (Some(Some(x)))` or even `should be (Some(None))`)
+but it worked. Since I've extracted that routine to a parameter, the need for this suddenly disappeared - I was just
+mocking the thing with immediate evaluation.
+
 ## What could be done differently
 
 ### Error handling
@@ -85,3 +110,20 @@ Have to come up with a reasonable way to handle that.
 ### Testing
 
 Could add more integration tests to cover the API overall, not just core parts of logic.
+
+### Chaining `Cache` methods
+
+I was thinking about returning `F[Cache[F, K, V]]` from `Cache#put` so that I can write something like this
+(in the test, for ex.):
+
+```scala
+cacheIO.flatMap(_.put("extravaganza", 7)).flatMap(_.get("extravaganza")).unsafeRunTimed(10.seconds) should be (Some(Some(7)))
+```
+
+That might be controversial in some sense, but would make `Cache` more functional rather than effectful. 
+
+Alternatively, _(if `IO` monad would allow that)_ I would use `flatTap` _(which `IO` does not implement)_:
+
+```scala
+cacheIO.flatTap(_.put("extravaganza", 7)).flatMap(_.get("extravaganza")).unsafeRunTimed(10.seconds) should be (Some(Some(7)))
+```

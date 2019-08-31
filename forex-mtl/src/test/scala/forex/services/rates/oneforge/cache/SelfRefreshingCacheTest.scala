@@ -1,7 +1,7 @@
 package forex.services.rates.oneforge.cache
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.effect.concurrent.Ref
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
@@ -12,13 +12,15 @@ class SelfRefreshingCacheTest extends FunSuite {
 
   val initialState = Map[String, Int]("existing" -> 42)
   val refresher    = (state: Map[String, Int]) => IO { state.updated("burrito", -14) }
-  val trigger      = IO.unit
 
   implicit val cs    = IO.contextShift(global)
   implicit val timer = IO.timer(global)
 
+  val refreshingRoutine =
+    (state: Ref[IO, Map[String, Int]]) => state.get.flatMap(refresher).flatMap(state.getAndSet).flatMap(_ => IO.unit)
+
   val cacheIO: IO[Cache[IO, String, Int]] =
-    SelfRefreshingCache.createCache[IO, String, Int](initialState, refresher, trigger)
+    SelfRefreshingCache.createCache[IO, String, Int](initialState, refreshingRoutine)
 
   test("#get returns Some for existing value") {
     cacheIO.flatMap(c => c.get("existing")).unsafeRunTimed(10.seconds) should be (Some(Some(42)))
@@ -28,8 +30,7 @@ class SelfRefreshingCacheTest extends FunSuite {
     cacheIO.flatMap(c => c.get("incognito")).unsafeRunTimed(10.seconds) should be (Some(None))
   }
 
-  // TODO: have to figure out how to trigger the `Concurrent#sync` execution
-  ignore("#get after #put returns new value") {
+  test("#get after #put returns new value") {
     val newCacheIO = for {
       cache <- cacheIO
       _ <- cache.put("extravaganza", 7)

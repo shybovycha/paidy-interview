@@ -11,13 +11,7 @@ class OneForgeLiveClientTest extends FunSuite {
 
   test("#fetchPossiblePairs returns all currency pairs available") {}
 
-  // this does not seem quite right
-  test("#fetchPossiblePairs returns CanNotParseSymbolsUri when unable to parse URI") {}
-
   test("#fetchQuotes converts all the currencies passed") {}
-
-  // this does not seem quite right
-  test("#fetchQuotes returns error when unable to parse URI") {}
 
   ignore("not testing #oneForgeConvertRate since this would only test http4s client which we do not want to test ourselves")
 
@@ -25,7 +19,11 @@ class OneForgeLiveClientTest extends FunSuite {
 
   test("#convertRateUri constructs URI from configuration passed") {}
 
+  test("#convertRateUri returns CanNotParseConvertUri when unable to parse URI") {}
+
   test("#symbolsUri constructs URI from configuration passed") {}
+
+  test("#symbolsUri returns CanNotParseSymbolsUri when unable to parse URI") {}
 
   test("#quoteToRate extracts Rate from QuoteDTO response object") {}
 

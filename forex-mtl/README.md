@@ -55,6 +55,23 @@ designed to be used in couple with `SelfRefreshingCache` exclusively.
 It is the provider of the `refresher` instance to the `SelfRefreshingCache`. It takes the base URL and the
 cache expiration timeout from the config file, `application.conf`, the `forex` section.
 
+One more extravagant solution which could have been applied in this class is using the `Nested` monad transformer.
+However, it would not give ton of benefit (in fact, it will make things just worse - monad transformers are known to be
+slow and using it will add more characters to the code for sake 🍶 of just one operation):
+
+```scala
+import cats.data.Nested
+Nested(symbolsUri.flatMap(fetcher)).map(parseCurrencyPairFromCode).value
+```
+
+vs
+
+```scala
+symbolsUri .flatMap(fetcher) .map(_.map(parseCurrencyPairFromCode))
+```
+
+See how it is `29` chars less and achieves exactly the same goal.
+
 ### Rates interpreters
 
 This project is not fully tagless, so it uses the classic dependency-injection-like approach of instantiating the

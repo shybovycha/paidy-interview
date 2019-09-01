@@ -21,7 +21,10 @@ class RatesHttpRoutes[F[_]: Sync](rates: RatesProgram[F]) extends Http4sDsl[F] {
     case GET -> Root :? FromQueryParam(from) +& ToQueryParam(to) =>
       rates.get(RatesProgramProtocol.GetRatesRequest(from, to))
         .flatMap(rateEither =>
-          rateEither.fold(_ => InternalServerError(s"Can not convert ${from} to ${to}"), rate => Ok(rate.asGetApiResponse))
+          rateEither.fold(
+            _ => InternalServerError(s"Can not convert ${from} to ${to}"),
+            rate => Ok(rate.asGetApiResponse)
+          )
         )
   }
 

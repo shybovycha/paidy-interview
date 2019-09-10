@@ -24,8 +24,11 @@ object SelfRefreshingCache {
 
   def createCache[F[_]: Concurrent, K, V](initialState: Map[K, V], refreshRoutine: Ref[F, Map[K, V]] => F[Unit]): F[Cache[F, K, V]] =
     Ref.of[F, Map[K, V]](initialState)
-      .flatTap(refreshRoutine(_).start.void)
+      .flatTap(refreshRoutine)
       .map(new SelfRefreshingCache[F, K, V](_))
+
+  def createAsyncRefresher[F[_]: Concurrent, K, V](refresher: Ref[F, Map[K, V]] => F[Unit]): Ref[F, Map[K, V]] => F[Unit] =
+    state => refresher(state).start.void
 
   def createRecursiveRefresher[F[_]: Monad, K, V](refresher: Map[K, V] => F[Map[K, V]], trigger: F[Unit]): Ref[F, Map[K, V]] => F[Unit] =
     (state: Ref[F, Map[K, V]]) =>

@@ -1,7 +1,7 @@
 package forex.programs.rates
 
 import cats.Functor
-import cats.syntax.functor._
+import cats.data.EitherT
 import forex.domain._
 import forex.programs.rates.Errors._
 import forex.services.RatesService
@@ -9,8 +9,7 @@ import forex.services.RatesService
 class Program[F[_]: Functor](ratesService: RatesService[F]) extends Algebra[F] {
 
   override def get(request: Protocol.GetRatesRequest): F[Error Either Rate] =
-    ratesService.get(Rate.Pair(request.from, request.to))
-      .map(_.left.map(toProgramError)) // convert service-level error to program-level error
+    EitherT(ratesService.get(Rate.Pair(request.from, request.to))).leftMap(toProgramError).value // convert service-level error to program-level error
 
 }
 

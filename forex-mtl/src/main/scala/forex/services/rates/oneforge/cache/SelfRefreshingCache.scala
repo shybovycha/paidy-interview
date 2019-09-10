@@ -27,16 +27,15 @@ object SelfRefreshingCache {
       .flatTap(refreshRoutine(_).start.void)
       .map(new SelfRefreshingCache[F, K, V](_))
 
-  def createRecursiveRefresher[F[_]: Monad, K, V](refresher: Map[K, V] => F[Map[K, V]], trigger: F[Unit]): Ref[F, Map[K, V]] => F[Unit] = {
-    def refreshRoutine(state: Ref[F, Map[K, V]]): F[Unit] =
-      state.get
-        .flatMap(refresher)
-        .flatMap(state.getAndSet)
-        .flatMap(_ => trigger)
-        .flatMap(_ => refreshRoutine(state))
-
-    refreshRoutine
-  }
+  def createRecursiveRefresher[F[_]: Monad, K, V](refresher: Map[K, V] => F[Map[K, V]], trigger: F[Unit]): Ref[F, Map[K, V]] => F[Unit] =
+    (state: Ref[F, Map[K, V]]) =>
+      Monad[F].tailRecM(state) (_ =>
+        state.get
+          .flatMap(refresher)
+          .flatMap(state.getAndSet)
+          .flatMap(_ => trigger)
+          .map(_ => Left(state))
+      )
 
   def createRepeatedTrigger[F[_]: Timer](timeout: FiniteDuration): F[Unit] =
     Timer[F].sleep(timeout)

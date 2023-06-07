@@ -3,7 +3,6 @@ package forex
 import cats.effect._
 import scala.concurrent.ExecutionContext
 
-import cats.syntax.all._
 import forex.config._
 import forex.services.rates.oneforge.cache.OneForgeLiveClient
 import forex.services.rates.oneforge.cache.QuoteCache

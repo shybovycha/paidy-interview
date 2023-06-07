@@ -3,28 +3,32 @@ package forex.services.rates.oneforge.cache
 import cats.effect._
 import cats.implicits._
 import forex.domain.Rate
-import org.http4s.Uri
+import forex.services.rates.oneforge.cache.OneForgeLiveClient.{oneForgeConvertRate, oneForgeSymbols}
+import forex.services.rates.oneforge.cache.SelfRefreshingCache.{createAsyncRefresher, createCache, createRecursiveRefresher, createRepeatedTrigger}
 
 import scala.concurrent.duration.FiniteDuration
 
 object QuoteCache {
 
-  def create[F[_]: ConcurrentEffect: Timer](client: OneForgeLiveClient[F], dataExpiresIn: FiniteDuration): F[Cache[F, Rate.Pair, Rate]] =
-    SelfRefreshingCache.createCache[F, Rate.Pair, Rate](
-      Map.empty,
-      SelfRefreshingCache.createAsyncRefresher(
-        SelfRefreshingCache.createRecursiveRefresher(refreshRatesCache[F](client), SelfRefreshingCache.createRepeatedTrigger(dataExpiresIn))
-      )
-    )
+  def create[F[_]: ConcurrentEffect: Timer](client: OneForgeLiveClient[F], dataExpiresIn: FiniteDuration): F[Cache[F, Rate.Pair, Rate]] = {
+    val trigger = createRepeatedTrigger(dataExpiresIn)
+    val refreshFn = refreshRatesCache[F](client)(_)
+    val refresher = createRecursiveRefresher(refreshFn, trigger)
+    val asyncRefresher = createAsyncRefresher(refresher)
 
-  def refreshRatesCache[F[_]: ConcurrentEffect](client: OneForgeLiveClient[F])(existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] =
-    getCurrencyPairs[F](client, existingRates)
-      .flatMap(client.fetchQuotes(_, OneForgeLiveClient.oneForgeConvertRate[F]))
-      .map(updateCache(existingRates, _))
+    createCache[F, Rate.Pair, Rate](Map.empty, asyncRefresher)
+  }
+
+  def refreshRatesCache[F[_]: ConcurrentEffect](client: OneForgeLiveClient[F])(existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] = {
+    for {
+      currencyPairs <- getCurrencyPairs[F](client, existingRates)
+      quotes <- client.fetchQuotes(currencyPairs, oneForgeConvertRate[F])
+    } yield updateCache(existingRates, quotes)
+  }
 
   def getCurrencyPairs[F[_]: ConcurrentEffect](client: OneForgeLiveClient[F], existingRates: Map[Rate.Pair, Rate]): F[List[Rate.Pair]] =
     if (existingRates.isEmpty) {
-      client.fetchPossiblePairs((uri: Uri) => OneForgeLiveClient.oneForgeSymbols[F](uri))
+      client.fetchPossiblePairs(oneForgeSymbols[F](_))
     } else {
       existingRates.keySet.toList.pure[F]
     }

@@ -28,36 +28,40 @@ case class QuoteDTO(symbol: String, price: Double)
 
 class OneForgeLiveClient[F[_]](config: ForexConfig)(implicit ce: MonadError[F, Throwable]) {
 
-  def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] =
-    symbolsUri
-      .flatMap(fetcher)
-      .map(_.map(parseCurrencyPairFromCode))
+  def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] = {
+    for {
+      uri <- symbolsUri
+      symbols <- fetcher(uri)
+    } yield symbols.map(parseCurrencyPairFromCode)
+  }
 
-  def fetchQuotes(currencyPairs: List[Rate.Pair], fetcher: Uri => F[List[QuoteDTO]]): F[List[Rate]] =
-    convertRateUri(currencyPairs)
-      .flatMap(fetcher)
-      .map(_.map(quoteToRate))
+  def fetchQuotes(currencyPairs: List[Rate.Pair], fetcher: Uri => F[List[QuoteDTO]]): F[List[Rate]] = {
+    for {
+      uri <- convertRateUri(currencyPairs)
+      quotes <- fetcher(uri)
+    } yield quotes.map(quoteToRate)
+  }
 
   private[cache] def convertRateUri(currencyPairs: List[Rate.Pair]): F[Uri] =
-    Uri.fromString(config.host)
-      .map(_.withPath("/convert")
+    Uri.fromString(config.host) match {
+      case Left(error) => ce.raiseError[Uri](CanNotParseConvertUri(error))
+
+      case Right(uri) => uri
+        .withPath("/convert")
         .withQueryParam("pairs", currencyPairs.map(e => s"${e.from}${e.to}").mkString(","))
         .withQueryParam("api_key", config.apiKey)
-      )
-      .fold(
-        error => ce.raiseError[Uri](CanNotParseConvertUri(error)),
-        uri => uri.pure[F]
-      )
+        .pure[F]
+    }
 
   private[cache] def symbolsUri: F[Uri] =
-    Uri.fromString(config.host)
-      .map(_.withPath("/symbols")
+    Uri.fromString(config.host) match {
+      case Left(error) => ce.raiseError[Uri](CanNotParseSymbolsUri(error))
+
+      case Right(uri) => uri
+        .withPath("/symbols")
         .withQueryParam("api_key", config.apiKey)
-      )
-      .fold(
-        error => ce.raiseError[Uri](CanNotParseSymbolsUri(error)),
-        uri => uri.pure[F]
-      )
+        .pure[F]
+    }
 
   private[cache] def quoteToRate(quote: QuoteDTO): Rate = {
     val pair = parseCurrencyPairFromCode(quote.symbol)

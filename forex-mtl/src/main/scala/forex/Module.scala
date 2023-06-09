@@ -1,6 +1,6 @@
 package forex
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.Async
 import forex.config.ApplicationConfig
 import forex.domain.Rate
 import forex.http.rates.RatesHttpRoutes
@@ -8,10 +8,9 @@ import forex.programs._
 import forex.services._
 import forex.services.cache.Cache
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.server.middleware.{AutoSlash, Timeout}
 
-class Module[F[_]: ConcurrentEffect: Timer](config: ApplicationConfig, cache: Cache[F, Rate.Pair, Rate]) {
+class Module[F[_]: Async](config: ApplicationConfig, cache: Cache[F, Rate.Pair, Rate]) {
 
   private val ratesService: RatesService[F] = RatesServices.live[F](implicitly, cache)
 

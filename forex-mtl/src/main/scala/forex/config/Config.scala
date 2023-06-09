@@ -2,7 +2,6 @@ package forex.config
 
 import cats.effect.Sync
 import fs2.Stream
-
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
 
@@ -13,7 +12,8 @@ object Config {
    */
   def stream[F[_]: Sync](path: String): Stream[F, ApplicationConfig] = {
     Stream.eval(Sync[F].delay(
-      ConfigSource.default.at(path).loadOrThrow[ApplicationConfig]))
+      ConfigSource.default.at(path).loadOrThrow[ApplicationConfig])
+    )
   }
 
 }

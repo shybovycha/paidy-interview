@@ -2,7 +2,7 @@ package forex.services.rates.oneforge
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import forex.config.ForexConfig
 import forex.domain._
 import forex.services.rates.Errors.Error._
@@ -10,15 +10,13 @@ import forex.services.rates.Errors._
 import forex.services.rates.oneforge.OneForgeLiveClient.handleHttpError
 import io.circe.generic.auto._
 import org.http4s.circe.jsonOf
-import org.http4s.client.UnexpectedStatus
-import org.http4s.client.blaze.BlazeClientBuilder
-import org.http4s.{ EntityDecoder, InvalidMessageBodyFailure, Uri }
+import org.http4s.client.{Client, UnexpectedStatus}
+import org.http4s.{EntityDecoder, InvalidMessageBodyFailure, Uri}
 
 import java.net.ConnectException
 import java.util.concurrent.TimeoutException
-import scala.concurrent.ExecutionContext.Implicits.global
 
-class OneForgeLiveClient[F[_]: ConcurrentEffect](config: ForexConfig)(implicit ce: MonadError[F, Throwable])
+class OneForgeLiveClient[F[_]: Async](config: ForexConfig, httpClient: Resource[F, Client[F]])(implicit ce: MonadError[F, Throwable])
     extends OneForgeClient[F] {
 
   override def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] =
@@ -34,26 +32,30 @@ class OneForgeLiveClient[F[_]: ConcurrentEffect](config: ForexConfig)(implicit c
     } yield quotes.map(quoteToRate)
 
   private def convertRateUri(currencyPairs: List[Rate.Pair]): F[Uri] =
-    Uri.fromString(config.host) match {
-      case Left(error) => ce.raiseError[Uri](CanNotParseConvertUri(error))
+    (for {
+      baseUri <- Uri.fromString(config.host)
+      path <- Uri.fromString("/convert")
+      uri = baseUri
+        .withPath(path.path)
+        .withQueryParam("pairs", currencyPairs.map(e => s"${e.from}${e.to}"))
+        .withQueryParam("api_key", config.apiKey)
+    } yield uri) match {
+      case Left(error) => ce.raiseError(CanNotParseConvertUri(error))
 
-      case Right(uri) =>
-        uri
-          .withPath("/convert")
-          .withQueryParam("pairs", currencyPairs.map(e => s"${e.from}${e.to}"))
-          .withQueryParam("api_key", config.apiKey)
-          .pure[F]
+      case Right(uri) => uri.pure[F]
     }
 
   private def symbolsUri: F[Uri] =
-    Uri.fromString(config.host) match {
+    (for {
+      baseUri <- Uri.fromString(config.host)
+      path <- Uri.fromString("/symbols")
+      uri = baseUri
+        .withPath(path.path)
+        .withQueryParam("api_key", config.apiKey)
+    } yield uri) match {
       case Left(error) => ce.raiseError[Uri](CanNotParseSymbolsUri(error))
 
-      case Right(uri) =>
-        uri
-          .withPath("/symbols")
-          .withQueryParam("api_key", config.apiKey)
-          .pure[F]
+      case Right(uri) => uri.pure[F]
     }
 
   private def quoteToRate(quote: QuoteDTO): Rate = {
@@ -73,15 +75,15 @@ class OneForgeLiveClient[F[_]: ConcurrentEffect](config: ForexConfig)(implicit c
   override def oneForgeConvertRate(uri: Uri): F[List[QuoteDTO]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
 
-    BlazeClientBuilder[F](global).resource
+    httpClient
       .use(_.expect[List[QuoteDTO]](uri))
       .handleErrorWith(error => ce.raiseError[List[QuoteDTO]](handleHttpError(error)))
   }
 
   override def oneForgeSymbols(uri: Uri): F[List[String]] = {
-    implicit val quoteListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
+    implicit val symbolListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
 
-    BlazeClientBuilder[F](global).resource
+    httpClient
       .use(_.expect[List[String]](uri))
       .handleErrorWith(error => ce.raiseError[List[String]](handleHttpError(error)))
   }

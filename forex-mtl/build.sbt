@@ -3,7 +3,7 @@ import Dependencies._
 name := "forex"
 version := "1.0.1"
 
-scalaVersion := "2.13.5"
+scalaVersion := "2.13.8"
 scalacOptions ++= Seq(
   "-deprecation", // Emit warning and location for usages of deprecated APIs.
   "-encoding",
@@ -51,18 +51,17 @@ resolvers +=
 
 libraryDependencies ++= Seq(
   compilerPlugin(Libraries.kindProjector),
-  Libraries.cats,
   Libraries.catsEffect,
   Libraries.fs2,
+  Libraries.http4sCore,
   Libraries.http4sDsl,
   Libraries.http4sServer,
   Libraries.http4sCirce,
-  Libraries.http4sBlazeClient,
   Libraries.http4sClient,
-  Libraries.circeCore,
   Libraries.circeGeneric,
   Libraries.circeGenericExt,
   Libraries.circeParser,
+  Libraries.circeLiteral,
   Libraries.pureConfig,
   Libraries.logback,
   Libraries.scalaTest        % Test,

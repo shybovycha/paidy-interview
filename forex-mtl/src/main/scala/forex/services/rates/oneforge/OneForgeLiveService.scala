@@ -18,7 +18,7 @@ class OneForgeLiveService[F[_]: Functor](implicit cache: Cache[F, Rate.Pair, Rat
 
 object OneForgeLiveService {
 
-  def apply[F[_]: ConcurrentEffect](implicit cache: Cache[F, Rate.Pair, Rate]): Algebra[F] =
+  def apply[F[_]: Concurrent](implicit cache: Cache[F, Rate.Pair, Rate]): Algebra[F] =
     new OneForgeLiveService
 
 }

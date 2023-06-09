@@ -1,9 +1,8 @@
 package forex.services.cache
 
 import cats.Monad
-import cats.effect.{ Timer, _ }
-import cats.effect.concurrent.Ref
-import cats.effect.syntax.concurrent._
+import cats.effect.implicits.genSpawnOps
+import cats.effect.{Concurrent, Ref, Temporal}
 import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
@@ -46,7 +45,7 @@ object SelfRefreshingCache {
         _ <- trigger
       } yield stateRef.asLeft[Unit]
 
-  def createRepeatedTrigger[F[_]: Timer](timeout: FiniteDuration): F[Unit] =
-    Timer[F].sleep(timeout)
+  def createRepeatedTrigger[F[_]: Temporal](timeout: FiniteDuration): F[Unit] =
+    Temporal[F].sleep(timeout)
 
 }

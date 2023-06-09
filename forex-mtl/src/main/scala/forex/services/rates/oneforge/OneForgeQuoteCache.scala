@@ -1,18 +1,18 @@
 package forex.services.rates.oneforge
 
 import cats.Monad
-import cats.effect.{ Concurrent, Timer }
+import cats.effect.Temporal
 import cats.implicits.toFunctorOps
 import cats.syntax.all._
 import forex.domain.Rate
 import forex.services.cache.SelfRefreshingCache
-import forex.services.cache.SelfRefreshingCache.{ createCache, createRepeatedTrigger }
+import forex.services.cache.SelfRefreshingCache.{createCache, createRepeatedTrigger}
 
 import scala.concurrent.duration.FiniteDuration
 
 object OneForgeQuoteCache {
 
-  def create[F[_]: Concurrent: Timer](
+  def create[F[_]: Temporal](
       client: OneForgeClient[F],
       dataExpiresIn: FiniteDuration
   ): F[SelfRefreshingCache[F, Rate.Pair, Rate]] = {

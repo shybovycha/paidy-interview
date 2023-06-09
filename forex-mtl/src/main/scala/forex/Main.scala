@@ -1,33 +1,43 @@
 package forex
 
 import cats.effect._
+import cats.syntax.all._
+import com.comcast.ip4s.{Host, IpLiteralSyntax, Port}
 import forex.config._
 import forex.services.rates.oneforge.{OneForgeLiveClient, OneForgeQuoteCache}
 import fs2.Stream
-import org.http4s.server.blaze.BlazeServerBuilder
-import cats.syntax.all._
-
-import scala.concurrent.ExecutionContext
+import fs2.io.net.Network
+import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.ember.server.EmberServerBuilder
 
 object Main extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] =
-    new Application[IO].stream(executionContext).compile.drain.as(ExitCode.Success)
+    new Application[IO].stream.compile.drain
+      .as(ExitCode.Success)
 
 }
 
-class Application[F[_]: ConcurrentEffect: Timer] {
+class Application[F[_]: Async: Network] {
 
-  def stream(ec: ExecutionContext): Stream[F, Unit] =
+  def stream: Stream[F, Unit] =
     for {
       config <- Config.stream("app")
-      oneForgeClient = new OneForgeLiveClient[F](config.forex)
-      cache <- Stream.eval(OneForgeQuoteCache.create(oneForgeClient, config.forex.ttl).flatTap(_.start()))
+      httpClient <- Stream.eval(EmberClientBuilder
+        .default[F]
+        .build
+        .pure[F])
+      oneForgeClient = new OneForgeLiveClient[F](config.forex, httpClient)
+      cache <- Stream.eval(OneForgeQuoteCache.create(oneForgeClient, config.forex.ttl))
+      _ <- Stream.eval(cache.start())
       module = new Module[F](config, cache)
-      _ <- BlazeServerBuilder[F](ec)
-            .bindHttp(config.http.port, config.http.host)
-            .withHttpApp(module.httpApp)
-            .serve
+      server = EmberServerBuilder
+        .default[F]
+        .withHostOption(Host.fromString(config.http.host))
+        .withPort(Port.fromInt(config.http.port).getOrElse(port"80"))
+        .withHttpApp(module.httpApp)
+        .build
+      _ <- Stream.resource(server)
     } yield ()
 
 }

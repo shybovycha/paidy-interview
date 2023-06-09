@@ -1,4 +1,4 @@
-package forex.services.rates.oneforge.cache
+package forex.services.cache
 
 trait Cache[F[_], K, V] {
   def get(key: K): F[Option[V]]

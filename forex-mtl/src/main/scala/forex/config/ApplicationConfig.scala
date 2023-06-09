@@ -10,7 +10,7 @@ case class ApplicationConfig(
 case class ForexConfig(
     host: String,
     apiKey: String,
-    dataExpiresIn: FiniteDuration
+    ttl: FiniteDuration
 )
 
 case class HttpConfig(

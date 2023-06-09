@@ -7,7 +7,7 @@ import forex.domain.Rate
 import forex.services.rates.Algebra
 import forex.services.rates.Errors.Error.CacheIsOutOfDate
 import forex.services.rates.Errors._
-import forex.services.rates.oneforge.cache.Cache
+import forex.services.cache.Cache
 
 class OneForgeLiveService[F[_]: Functor](implicit cache: Cache[F, Rate.Pair, Rate]) extends Algebra[F] {
 
@@ -18,7 +18,7 @@ class OneForgeLiveService[F[_]: Functor](implicit cache: Cache[F, Rate.Pair, Rat
 
 object OneForgeLiveService {
 
-  def apply[F[_]: ConcurrentEffect: Timer](implicit cache: Cache[F, Rate.Pair, Rate]): Algebra[F] =
+  def apply[F[_]: ConcurrentEffect](implicit cache: Cache[F, Rate.Pair, Rate]): Algebra[F] =
     new OneForgeLiveService
 
 }

@@ -4,7 +4,7 @@ import cats.effect.IO
 import forex.domain._
 import forex.services.rates.Errors.Error.CacheIsOutOfDate
 import forex.services.rates.Errors._
-import forex.services.rates.oneforge.cache.Cache
+import forex.services.cache.Cache
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 

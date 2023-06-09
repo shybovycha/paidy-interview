@@ -1,11 +1,11 @@
-package forex.services.rates.oneforge.cache
+package forex.services.cache
 
 import java.net.ConnectException
-
 import cats.effect.IO
 import forex.config.ForexConfig
 import forex.domain._
 import forex.services.rates.Errors.Error._
+import forex.services.rates.oneforge.{OneForgeLiveClient, QuoteDTO}
 import org.http4s.InvalidMessageBodyFailure
 import org.http4s.Status
 import org.http4s.Uri
@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 
 class OneForgeLiveClientTest extends FunSuite {
 
-  val config = ForexConfig(host = "http://example.com", apiKey = "TEST_API_KEY", dataExpiresIn = 5.minutes)
+  val config = ForexConfig(host = "http://example.com", apiKey = "TEST_API_KEY", ttl = 5.minutes)
 
   test("#fetchPossiblePairs returns all currency pairs available") {
     val client = new OneForgeLiveClient[IO](config)
@@ -50,7 +50,7 @@ class OneForgeLiveClientTest extends FunSuite {
   }
 
   test("#convertRateUri returns CanNotParseConvertUri when unable to parse URI") {
-    val brokenConfig = ForexConfig(host = "zzpt:\\\\1::2:3:::4", apiKey = "?api?key", dataExpiresIn = 1.second)
+    val brokenConfig = ForexConfig(host = "zzpt:\\\\1::2:3:::4", apiKey = "?api?key", ttl = 1.second)
     val client = new OneForgeLiveClient[IO](brokenConfig)
 
     val currencyPairs = List(Rate.Pair(Currency.AUD, Currency.JPY))
@@ -65,7 +65,7 @@ class OneForgeLiveClientTest extends FunSuite {
   }
 
   test("#symbolsUri returns CanNotParseSymbolsUri when unable to parse URI") {
-    val brokenConfig = ForexConfig(host = "zzppt:\\\\1:2::3:::4", apiKey = "?api?key", dataExpiresIn = 1.second)
+    val brokenConfig = ForexConfig(host = "zzppt:\\\\1:2::3:::4", apiKey = "?api?key", ttl = 1.second)
     val client = new OneForgeLiveClient[IO](brokenConfig)
 
     a [CanNotParseSymbolsUri] should be thrownBy client.symbolsUri.unsafeRunSync()

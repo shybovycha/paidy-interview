@@ -1,4 +1,4 @@
-package forex.services.rates.oneforge.cache
+package forex.services.cache
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref

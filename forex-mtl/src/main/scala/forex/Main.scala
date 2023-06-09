@@ -1,13 +1,13 @@
 package forex
 
 import cats.effect._
-import scala.concurrent.ExecutionContext
-
 import forex.config._
-import forex.services.rates.oneforge.cache.OneForgeLiveClient
-import forex.services.rates.oneforge.cache.QuoteCache
+import forex.services.rates.oneforge.{OneForgeLiveClient, OneForgeQuoteCache}
 import fs2.Stream
 import org.http4s.server.blaze.BlazeServerBuilder
+import cats.syntax.all._
+
+import scala.concurrent.ExecutionContext
 
 object Main extends IOApp {
 
@@ -22,7 +22,7 @@ class Application[F[_]: ConcurrentEffect: Timer] {
     for {
       config <- Config.stream("app")
       oneForgeClient = new OneForgeLiveClient[F](config.forex)
-      cache <- Stream.eval(QuoteCache.create(oneForgeClient, config.forex.dataExpiresIn))
+      cache <- Stream.eval(OneForgeQuoteCache.create(oneForgeClient, config.forex.ttl).flatTap(_.start()))
       module = new Module[F](config, cache)
       _ <- BlazeServerBuilder[F](ec)
             .bindHttp(config.http.port, config.http.host)

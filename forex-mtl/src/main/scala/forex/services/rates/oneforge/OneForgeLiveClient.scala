@@ -19,7 +19,7 @@ import java.util.concurrent.TimeoutException
 class OneForgeLiveClient[F[_]: Async](config: ForexConfig, httpClient: Resource[F, Client[F]])(implicit ce: MonadError[F, Throwable])
     extends OneForgeClient[F] {
 
-  override def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] =
+  override def fetchKnownSymbols(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] =
     for {
       uri <- symbolsUri
       symbols <- fetcher(uri)
@@ -72,7 +72,7 @@ class OneForgeLiveClient[F[_]: Async](config: ForexConfig, httpClient: Resource[
     Rate.Pair(Currency.fromString(codes._1), Currency.fromString(codes._2))
   }
 
-  override def oneForgeConvertRate(uri: Uri): F[List[QuoteDTO]] = {
+  override def quotes(uri: Uri): F[List[QuoteDTO]] = {
     implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
 
     httpClient
@@ -80,7 +80,7 @@ class OneForgeLiveClient[F[_]: Async](config: ForexConfig, httpClient: Resource[
       .handleErrorWith(error => ce.raiseError[List[QuoteDTO]](handleHttpError(error)))
   }
 
-  override def oneForgeSymbols(uri: Uri): F[List[String]] = {
+  override def knownSymbols(uri: Uri): F[List[String]] = {
     implicit val symbolListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
 
     httpClient

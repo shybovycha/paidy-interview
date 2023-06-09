@@ -26,13 +26,13 @@ object OneForgeQuoteCache {
                                              existingRates: Map[Rate.Pair, Rate]): F[Map[Rate.Pair, Rate]] =
     for {
       currencyPairs <- getCurrencyPairs(client, existingRates)
-      rates <- client.fetchQuotes(currencyPairs, uri => client.oneForgeConvertRate(uri))
+      rates <- client.fetchQuotes(currencyPairs, uri => client.quotes(uri))
     } yield updateCache(existingRates, rates)
 
   private def getCurrencyPairs[F[_]: Monad](client: OneForgeClient[F],
                                             existingRates: Map[Rate.Pair, Rate]): F[List[Rate.Pair]] =
     if (existingRates.isEmpty) {
-      client.fetchPossiblePairs(client.oneForgeSymbols)
+      client.fetchKnownSymbols(client.knownSymbols)
     } else {
       existingRates.keySet.toList.pure[F]
     }

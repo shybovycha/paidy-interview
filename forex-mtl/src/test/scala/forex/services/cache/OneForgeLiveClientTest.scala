@@ -25,7 +25,7 @@ class OneForgeLiveClientTest extends FunSuite {
 
     val fetcher = (_: Uri) => IO(List("AUDJPY", "EURUSD"))
 
-    client.fetchPossiblePairs(fetcher).unsafeRunSync() should contain only (Rate.Pair(Currency.AUD, Currency.JPY), Rate.Pair(Currency.EUR, Currency.USD))
+    client.fetchKnownSymbols(fetcher).unsafeRunSync() should contain only (Rate.Pair(Currency.AUD, Currency.JPY), Rate.Pair(Currency.EUR, Currency.USD))
   }
 
   test("#fetchQuotes converts all the currencies passed") {

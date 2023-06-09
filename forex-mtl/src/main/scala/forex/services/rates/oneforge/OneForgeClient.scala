@@ -7,12 +7,12 @@ case class QuoteDTO(symbol: String, price: Double)
 
 trait OneForgeClient[F[_]] {
 
-  def fetchPossiblePairs(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]]
+  def fetchKnownSymbols(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]]
 
   def fetchQuotes(currencyPairs: List[Rate.Pair], fetcher: Uri => F[List[QuoteDTO]]): F[List[Rate]]
 
-  def oneForgeSymbols(uri: Uri): F[List[String]]
+  def knownSymbols(uri: Uri): F[List[String]]
 
-  def oneForgeConvertRate(uri: Uri): F[List[QuoteDTO]]
+  def quotes(uri: Uri): F[List[QuoteDTO]]
 
 }

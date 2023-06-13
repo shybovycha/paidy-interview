@@ -1,16 +1,21 @@
 package forex
 
-import cats.effect.Async
+import cats.effect.{Async, Resource}
 import forex.config.ApplicationConfig
-import forex.domain.Rate
 import forex.http.rates.RatesHttpRoutes
 import forex.programs._
 import forex.services._
-import forex.services.cache.Cache
+import forex.services.rates.OneForgeInterpreter
+import forex.services.rates.oneforge.{LiveInterpreter => OneForgeLiveInterpreter}
 import org.http4s._
+import org.http4s.client.{Client => HttpClient}
 import org.http4s.server.middleware.{AutoSlash, Timeout}
 
-class Module[F[_]: Async](config: ApplicationConfig, ratesCache: Cache[F, Rate.Pair, Rate]) {
+class Module[F[_]: Async](config: ApplicationConfig, httpClient: Resource[F, HttpClient[F]]) {
+
+  private val oneForgeClient = new OneForgeLiveInterpreter[F](config.forex, httpClient)
+  private val ratesCache = OneForgeInterpreter.createCache[F](config.forex.ttl, oneForgeClient)
+  val oneForgeCacheRefresher: F[Unit] = ratesCache.start()
 
   private val ratesService: RatesService[F] = RatesServices.live[F](ratesCache)
 

@@ -8,8 +8,12 @@ import forex.services.RatesService
 
 class Program[F[_]: Functor](ratesService: RatesService[F]) extends Algebra[F] {
 
-  override def get(request: Protocol.GetRatesRequest): F[Error Either Rate] =
-    EitherT(ratesService.get(Rate.Pair(request.from, request.to))).leftMap(toProgramError).value // convert service-level error to program-level error
+  override def get(request: Protocol.GetRatesRequest): F[Error Either Rate] = {
+    val symbol = Rate.Pair(request.from, request.to)
+    val rate = ratesService.get(symbol)
+
+    EitherT(rate).leftMap(toProgramError).value // convert service-level error to program-level error
+  }
 
 }
 

@@ -7,7 +7,8 @@ import forex.config.ForexConfig
 import forex.domain._
 import forex.services.rates.Errors.Error._
 import forex.services.rates.Errors._
-import forex.services.rates.oneforge.OneForgeLiveClient.handleHttpError
+import forex.services.rates.oneforge.LiveInterpreter._
+import forex.services.rates.oneforge.Protocol.Quote
 import io.circe.generic.auto._
 import org.http4s.circe.jsonOf
 import org.http4s.client.{Client, UnexpectedStatus}
@@ -16,19 +17,19 @@ import org.http4s.{EntityDecoder, InvalidMessageBodyFailure, Uri}
 import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 
-class OneForgeLiveClient[F[_]: Async](config: ForexConfig, httpClient: Resource[F, Client[F]])(implicit ce: MonadError[F, Throwable])
-    extends OneForgeClient[F] {
+class LiveInterpreter[F[_]: Async](config: ForexConfig, httpClient: Resource[F, Client[F]])(implicit ce: MonadError[F, Throwable])
+    extends Algebra[F] {
 
-  override def fetchKnownSymbols(fetcher: Uri => F[List[String]]): F[List[Rate.Pair]] =
+  override def knownSymbols(): F[List[Rate.Pair]] =
     for {
       uri <- symbolsUri
-      symbols <- fetcher(uri)
+      symbols <- fetchKnownSymbols(uri)
     } yield symbols.map(parseCurrencyPairFromCode)
 
-  override def fetchQuotes(currencyPairs: List[Rate.Pair], fetcher: Uri => F[List[QuoteDTO]]): F[List[Rate]] =
+  override def rates(currencyPairs: List[Rate.Pair]): F[List[Rate]] =
     for {
       uri <- convertRateUri(currencyPairs)
-      quotes <- fetcher(uri)
+      quotes <- fetchQuotes(uri)
     } yield quotes.map(quoteToRate)
 
   private def convertRateUri(currencyPairs: List[Rate.Pair]): F[Uri] =
@@ -58,29 +59,15 @@ class OneForgeLiveClient[F[_]: Async](config: ForexConfig, httpClient: Resource[
       case Right(uri) => uri.pure[F]
     }
 
-  private def quoteToRate(quote: QuoteDTO): Rate = {
-    val pair      = parseCurrencyPairFromCode(quote.symbol)
-    val price     = Price(quote.price)
-    val timestamp = Timestamp.now
-
-    Rate(pair, price, timestamp)
-  }
-
-  private def parseCurrencyPairFromCode(codePair: String): Rate.Pair = {
-    val codes = (codePair.substring(0, 3), codePair.substring(3, 6))
-
-    Rate.Pair(Currency.fromString(codes._1), Currency.fromString(codes._2))
-  }
-
-  override def quotes(uri: Uri): F[List[QuoteDTO]] = {
-    implicit val quoteListDecoder: EntityDecoder[F, List[QuoteDTO]] = jsonOf[F, List[QuoteDTO]]
+  private def fetchQuotes(uri: Uri): F[List[Quote]] = {
+    implicit val quoteListDecoder: EntityDecoder[F, List[Quote]] = jsonOf[F, List[Quote]]
 
     httpClient
-      .use(_.expect[List[QuoteDTO]](uri))
-      .handleErrorWith(error => ce.raiseError[List[QuoteDTO]](handleHttpError(error)))
+      .use(_.expect[List[Quote]](uri))
+      .handleErrorWith(error => ce.raiseError[List[Quote]](handleHttpError(error)))
   }
 
-  override def knownSymbols(uri: Uri): F[List[String]] = {
+  private def fetchKnownSymbols(uri: Uri): F[List[String]] = {
     implicit val symbolListDecoder: EntityDecoder[F, List[String]] = jsonOf[F, List[String]]
 
     httpClient
@@ -90,7 +77,21 @@ class OneForgeLiveClient[F[_]: Async](config: ForexConfig, httpClient: Resource[
 
 }
 
-object OneForgeLiveClient {
+object LiveInterpreter {
+
+  private[oneforge] def quoteToRate(quote: Quote): Rate = {
+    val pair = parseCurrencyPairFromCode(quote.symbol)
+    val price = Price(quote.price)
+    val timestamp = Timestamp.now
+
+    Rate(pair, price, timestamp)
+  }
+
+  private[oneforge] def parseCurrencyPairFromCode(codePair: String): Rate.Pair = {
+    val codes = (codePair.substring(0, 3), codePair.substring(3, 6))
+
+    Rate.Pair(Currency.fromString(codes._1), Currency.fromString(codes._2))
+  }
 
   private[oneforge] def handleHttpError(error: Throwable): Error = error match {
     case _: TimeoutException          => NetworkFailure(error)

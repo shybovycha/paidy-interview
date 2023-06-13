@@ -10,9 +10,9 @@ import forex.services.cache.Cache
 import org.http4s._
 import org.http4s.server.middleware.{AutoSlash, Timeout}
 
-class Module[F[_]: Async](config: ApplicationConfig, cache: Cache[F, Rate.Pair, Rate]) {
+class Module[F[_]: Async](config: ApplicationConfig, ratesCache: Cache[F, Rate.Pair, Rate]) {
 
-  private val ratesService: RatesService[F] = RatesServices.live[F](implicitly, cache)
+  private val ratesService: RatesService[F] = RatesServices.live[F](ratesCache)
 
   private val ratesProgram: RatesProgram[F] = RatesProgram[F](ratesService)
 

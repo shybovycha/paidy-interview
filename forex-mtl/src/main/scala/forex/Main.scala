@@ -33,8 +33,8 @@ class Application[F[_]: Async: Network] {
         .withPort(Port.fromInt(config.http.port).getOrElse(port"80"))
         .withHttpApp(module.httpApp)
         .build
-      _ <- Stream.repeatEval(module.oneForgeCacheRefresher)
       _ <- Stream.resource(server)
+        .concurrently(Stream.repeatEval(module.ratesCache.pure[F]))
     } yield ()
 
 }

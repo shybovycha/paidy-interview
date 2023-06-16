@@ -27,10 +27,9 @@ object OneForgeInterpreter {
   def createCache[F[_]: Temporal](ttl: FiniteDuration, oneForge: OneForgeClientAlgebra[F]): SelfRefreshingCache[F, Rate.Pair, Rate] = {
     implicit val oneForgeClient: OneForgeClientAlgebra[F] = oneForge
 
-    val refreshTrigger = SelfRefreshingCache.createRepeatedTrigger[F](ttl)
     val refreshFn      = refreshRatesCache[F](_)
 
-    SelfRefreshingCache.createCache[F, Rate.Pair, Rate](Map.empty, refreshFn, refreshTrigger)
+    SelfRefreshingCache.createCache[F, Rate.Pair, Rate](Map.empty, refreshFn, ttl)
   }
 
   private def refreshRatesCache[F[_]: Monad](existingRates: Map[Rate.Pair, Rate])(implicit oneForge: OneForgeClientAlgebra[F]): F[Map[Rate.Pair, Rate]] =

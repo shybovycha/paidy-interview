@@ -14,8 +14,7 @@ import org.http4s.server.middleware.{AutoSlash, Timeout}
 class Module[F[_]: Async](config: ApplicationConfig, httpClient: Resource[F, HttpClient[F]]) {
 
   private val oneForgeClient = new OneForgeLiveInterpreter[F](config.forex, httpClient)
-  private val ratesCache = OneForgeInterpreter.createCache[F](config.forex.ttl, oneForgeClient)
-  val oneForgeCacheRefresher: F[Unit] = ratesCache.start()
+  val ratesCache = OneForgeInterpreter.createCache[F](config.forex.ttl, oneForgeClient)
 
   private val ratesService: RatesService[F] = RatesServices.live[F](ratesCache)
 

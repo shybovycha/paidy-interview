@@ -11,6 +11,6 @@ object Interpreters {
     new DummyInterpreter[F]
 
   def live[F[_]: Temporal](cache: Cache[F, Rate.Pair, Rate]): OneForgeInterpreter[F] =
-    OneForgeInterpreter.create[F](cache)
+    new OneForgeInterpreter[F](cache)
 
 }

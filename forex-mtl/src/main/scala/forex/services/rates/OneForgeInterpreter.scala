@@ -21,9 +21,6 @@ class OneForgeInterpreter[F[_]: Functor](cache: Cache[F, Rate.Pair, Rate]) exten
 
 object OneForgeInterpreter {
 
-  def create[F[_]: Temporal](cache: Cache[F, Rate.Pair, Rate]): OneForgeInterpreter[F] =
-    new OneForgeInterpreter[F](cache)
-
   def createCache[F[_]: Temporal](ttl: FiniteDuration, oneForge: OneForgeClientAlgebra[F]): SelfRefreshingCache[F, Rate.Pair, Rate] = {
     implicit val oneForgeClient: OneForgeClientAlgebra[F] = oneForge
 
